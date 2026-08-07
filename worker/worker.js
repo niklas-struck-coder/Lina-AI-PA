@@ -337,6 +337,7 @@ export default {
           model: GROQ_MODEL,
           messages,
           max_tokens: 2048, // qwen3.6 verbraucht Tokens fürs "Denken" vor der eigentlichen Antwort
+          reasoning_format: 'hidden', // Denkteil serverseitig unterdrücken statt nachträglich rausfiltern
         }),
       });
 
@@ -347,9 +348,13 @@ export default {
       }
 
       let reply = data.choices?.[0]?.message?.content || '';
-      // qwen3.6 ist ein "Denk"-Modell und packt seinen Gedankengang in <think>-Tags
-      // vor die eigentliche Antwort - das soll der Nutzer nie sehen.
-      reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim() || '(keine Antwort)';
+      // Sicherheitsnetz: falls reasoning_format ignoriert wird oder der
+      // Denkteil vor dem schließenden Tag abgeschnitten wird (Modell rennt
+      // ins Token-Limit), nie rohen Gedankengang an den Nutzer weitergeben.
+      reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      if (!reply || reply.includes('<think>')) {
+        reply = 'Sorry, meine Antwort ist mir zu lang/komplex geraten und wurde abgeschnitten. Magst du die Frage nochmal kürzer stellen?';
+      }
 
       return jsonResponse({ reply });
     } catch (err) {
