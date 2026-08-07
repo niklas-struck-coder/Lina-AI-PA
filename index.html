@@ -540,6 +540,12 @@
 // const WORKER_URL = "https://lina-proxy.dein-name.workers.dev";
 const WORKER_URL = "https://wispy-term-8f4f.niklas-struck.workers.dev";
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+// Verlauf begrenzen, damit die Anfrage nicht unbegrenzt wächst (führte zu
+// HTTP 413 "Payload Too Large", sobald genug Nachrichten/Bilder/eine sehr
+// lange Antwort im Verlauf standen).
+const MAX_STORED_MESSAGES = 40; // wie viel lokal pro Person gespeichert bleibt
+const MAX_SENT_MESSAGES = 16;   // wie viel davon pro Anfrage an den Worker geht
+const MAX_SENT_TEXT_CHARS = 4000; // einzelne überlange Nachrichten kappen
 
 // ---- Team ----
 // voice: bevorzugte Stimmnamen (je nachdem was Browser/Gerät anbietet) +
@@ -672,7 +678,10 @@ function loadHistories() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      PERSONA_ORDER.forEach(k => { if (!Array.isArray(parsed[k])) parsed[k] = []; });
+      PERSONA_ORDER.forEach(k => {
+        if (!Array.isArray(parsed[k])) parsed[k] = [];
+        capHistory(parsed[k]);
+      });
       return parsed;
     } catch (e) { /* fällt durch auf leeren Zustand */ }
   }
@@ -1054,6 +1063,32 @@ function renderSettings() {
   });
 
   renderVoiceDiagnostics();
+  renderDangerZone();
+}
+
+function renderDangerZone() {
+  const box = document.createElement('div');
+  box.className = 'settings-voices';
+
+  const title = document.createElement('div');
+  title.className = 'settings-voices-title';
+  title.textContent = 'Bei Fehlern (z.B. "HTTP 413" oder sinnlose lange Antworten)';
+  box.appendChild(title);
+
+  const btn = document.createElement('button');
+  btn.className = 'settings-reset';
+  btn.style.width = '100%';
+  btn.style.marginTop = '8px';
+  btn.textContent = 'Kompletten Chatverlauf löschen';
+  btn.addEventListener('click', () => {
+    if (!confirm('Wirklich den gesamten Chatverlauf aller Personen löschen?')) return;
+    histories = { lina: [], it: [], marketing: [], support: [], team: [] };
+    saveHistories();
+    renderActiveTab();
+    closeSettings();
+  });
+  box.appendChild(btn);
+  settingsList.appendChild(box);
 }
 
 function renderVoiceDiagnostics() {
@@ -1126,10 +1161,43 @@ removeImageBtn.addEventListener('click', () => {
 // ---- Nachricht an eine Persona schicken ----
 // userContent: was an die API geschickt wird (String oder Content-Block-Array)
 // displayContent: was als Chat-Bubble gerendert wird (String oder {text, imageDataUrl})
+// Baut aus dem (lokal unbegrenzten) Verlauf eine gekappte Kopie fürs
+// Backend: nur die letzten MAX_SENT_MESSAGES Nachrichten, nur das jüngste
+// Bild (ältere Bilder raus), und keine einzelne Nachricht länger als
+// MAX_SENT_TEXT_CHARS. Verändert `hist` selbst nicht.
+function trimHistoryForRequest(hist) {
+  const recent = hist.slice(-MAX_SENT_MESSAGES);
+  let imageKept = false;
+  const out = [];
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const m = recent[i];
+    let content = m.content;
+    if (Array.isArray(content)) {
+      if (content.some(b => b.type === 'image')) {
+        if (imageKept) {
+          const textBlock = content.find(b => b.type === 'text');
+          content = [{ type: 'text', text: ((textBlock && textBlock.text) ? textBlock.text + ' ' : '') + '[altes Bild aus Verlauf entfernt]' }];
+        } else {
+          imageKept = true;
+        }
+      }
+    } else if (typeof content === 'string' && content.length > MAX_SENT_TEXT_CHARS) {
+      content = content.slice(0, MAX_SENT_TEXT_CHARS) + '\n[…gekürzt]';
+    }
+    out.unshift({ role: m.role, content });
+  }
+  return out;
+}
+
+function capHistory(hist) {
+  while (hist.length > MAX_STORED_MESSAGES) hist.shift();
+}
+
 async function askPersona(personaKey, userContent, displayContent) {
   const hist = histories[personaKey];
   addBubble('user', displayContent !== undefined ? displayContent : userContent);
   hist.push({ role: 'user', content: userContent });
+  capHistory(hist);
   saveHistories();
 
   const thinkingBubble = addBubble('lina thinking', getPersona(personaKey).name + ' denkt nach …', true, personaKey);
@@ -1139,7 +1207,7 @@ async function askPersona(personaKey, userContent, displayContent) {
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Access-Code': accessCode },
-      body: JSON.stringify({ messages: hist, persona: personaKey })
+      body: JSON.stringify({ messages: trimHistoryForRequest(hist), persona: personaKey })
     });
     if (res.status === 401) {
       thinkingBubble.remove();
@@ -1162,6 +1230,7 @@ async function askPersona(personaKey, userContent, displayContent) {
     }
 
     hist.push({ role: 'assistant', content: reply });
+    capHistory(hist);
     saveHistories();
     statusEl.textContent = 'bereit';
     statusEl.classList.remove('offline');
