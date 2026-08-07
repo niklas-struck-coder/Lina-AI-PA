@@ -70,14 +70,122 @@ const CORS_HEADERS = {
 const GROQ_MODEL = 'qwen/qwen3.6-27b'; // multimodal - kann Text und Bilder
 const PROJECT_STATUS_URL = 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/status.md';
 
-// Feste ElevenLabs-Stimmen pro Person (Standard-Bibliothek, mehrsprachig)
-const ELEVEN_VOICE_IDS = {
-  lina: 'MF3mGyEYCl7XYWbV9V6O',      // Elli - jung, klar, ausdrucksstark
-  it: 'ErXwobaYiN019PkySvjV',        // Antoni - professionell, männlich
-  marketing: 'AZnzlk1XvdvUeBnXmlld', // Domi - selbstbewusst, energisch
-  support: 'EXAVITQu4vr4xnSDxMaL',   // Bella - weich, freundlich
+// Feste Microsoft-Edge-Stimmen pro Person (inoffizieller Zugang zu den
+// gleichen Azure-Neural-Stimmen, die Edge im Browser für "Laut vorlesen"
+// nutzt - kostenlos, aber undokumentiert/inoffiziell: kann jederzeit ohne
+// Vorwarnung aufhören zu funktionieren. Fällt bei Fehlern auf die
+// Browser-eigene Stimme zurück, siehe index.html speakFallback().
+const EDGE_VOICE_NAMES = {
+  lina: 'de-DE-KatjaNeural',
+  it: 'de-DE-ConradNeural',
+  marketing: 'de-DE-KillianNeural',
+  support: 'de-DE-AmalaNeural',
 };
-const ELEVEN_MODEL = 'eleven_multilingual_v2';
+const EDGE_TTS_TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+const EDGE_TTS_ORIGIN = 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold';
+const EDGE_TTS_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0';
+
+async function computeSecMsGec() {
+  const WIN_EPOCH = 11644473600;
+  let ticks = Math.floor(Date.now() / 1000) + WIN_EPOCH;
+  ticks -= ticks % 300;
+  ticks *= 10000000; // 100-ns-Intervalle (Windows FILETIME)
+  const strToHash = `${ticks}${EDGE_TTS_TRUSTED_TOKEN}`;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(strToHash));
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+}
+
+function concatUint8Arrays(chunks) {
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) { out.set(c, offset); offset += c.length; }
+  return out;
+}
+
+// Ruft die inoffizielle Microsoft-Edge-TTS-Schnittstelle über eine
+// WebSocket-Verbindung auf und gibt die rohen MP3-Bytes zurück.
+async function fetchEdgeTTSAudio(text, voiceName) {
+  const secMsGec = await computeSecMsGec();
+  const connectionId = crypto.randomUUID().replace(/-/g, '');
+  const wsUrl =
+    `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1` +
+    `?TrustedClientToken=${EDGE_TTS_TRUSTED_TOKEN}&Sec-MS-GEC=${secMsGec}` +
+    `&Sec-MS-GEC-Version=1-131.0.2903.99&ConnectionId=${connectionId}`;
+
+  const upgradeRes = await fetch(wsUrl, {
+    headers: {
+      'Upgrade': 'websocket',
+      'Pragma': 'no-cache',
+      'Cache-Control': 'no-cache',
+      'Origin': EDGE_TTS_ORIGIN,
+      'User-Agent': EDGE_TTS_USER_AGENT,
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+
+  const ws = upgradeRes.webSocket;
+  if (!ws) throw new Error('Edge-TTS: WebSocket-Handshake fehlgeschlagen');
+  ws.accept();
+
+  return new Promise((resolve, reject) => {
+    const audioChunks = [];
+    let settled = false;
+    const finish = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch {}
+      fn(arg);
+    };
+    const timer = setTimeout(() => finish(reject, new Error('Edge-TTS: Zeitüberschreitung')), 15000);
+
+    ws.addEventListener('message', (event) => {
+      if (typeof event.data === 'string') {
+        if (event.data.includes('Path:turn.end')) {
+          finish(resolve, concatUint8Arrays(audioChunks));
+        }
+      } else {
+        const buf = new Uint8Array(event.data);
+        const headerLen = (buf[0] << 8) | buf[1];
+        audioChunks.push(buf.slice(2 + headerLen));
+      }
+    });
+    ws.addEventListener('close', () => {
+      finish(audioChunks.length ? resolve : reject, audioChunks.length ? concatUint8Arrays(audioChunks) : new Error('Edge-TTS: Verbindung ohne Audio geschlossen'));
+    });
+    ws.addEventListener('error', () => finish(reject, new Error('Edge-TTS: WebSocket-Fehler')));
+
+    const timestamp = new Date().toUTCString();
+    const configMsg =
+      `X-Timestamp:${timestamp}\r\n` +
+      `Content-Type:application/json; charset=utf-8\r\n` +
+      `Path:speech.config\r\n\r\n` +
+      `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`;
+    ws.send(configMsg);
+
+    const requestId = crypto.randomUUID().replace(/-/g, '');
+    const escapedText = String(text || '').slice(0, 2000)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const ssml =
+      `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='de-DE'>` +
+      `<voice name='${voiceName}'>` +
+      `<prosody pitch='+0Hz' rate='+0%' volume='+0%'>${escapedText}</prosody>` +
+      `</voice></speak>`;
+    const ssmlMsg =
+      `X-RequestId:${requestId}\r\n` +
+      `Content-Type:application/ssml+xml\r\n` +
+      `X-Timestamp:${timestamp}\r\n` +
+      `Path:ssml\r\n\r\n` +
+      ssml;
+    ws.send(ssmlMsg);
+  });
+}
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -222,31 +330,20 @@ export default {
       return jsonResponse({ error: 'Invalid JSON' }, 400);
     }
 
-    // Sprachausgabe (ElevenLabs) - separater Zweig, gleicher Endpunkt.
+    // Sprachausgabe (inoffizielle Microsoft-Edge-Stimmen) - separater Zweig,
+    // gleicher Endpunkt. Bei jedem Fehler springt das Frontend automatisch
+    // auf die Browser-eigene Stimme zurück (speakFallback in index.html).
     if (body.action === 'speak') {
-      const voicePersona = ELEVEN_VOICE_IDS[body.persona] ? body.persona : 'lina';
-      const voiceId = ELEVEN_VOICE_IDS[voicePersona];
+      const voicePersona = EDGE_VOICE_NAMES[body.persona] ? body.persona : 'lina';
+      const voiceName = EDGE_VOICE_NAMES[voicePersona];
       try {
-        const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'xi-api-key': env.ELEVENLABS_API_KEY,
-            'Accept': 'audio/mpeg',
-          },
-          body: JSON.stringify({
-            text: String(body.text || '').slice(0, 2000),
-            model_id: ELEVEN_MODEL,
-          }),
-        });
-        if (!ttsRes.ok) {
-          const errText = await ttsRes.text();
-          return jsonResponse({ error: 'ElevenLabs error: ' + errText }, ttsRes.status);
+        const audioBytes = await fetchEdgeTTSAudio(body.text, voiceName);
+        if (!audioBytes || audioBytes.length === 0) {
+          return jsonResponse({ error: 'Edge-TTS: kein Audio erhalten' }, 502);
         }
-        const audioBuffer = await ttsRes.arrayBuffer();
-        return jsonResponse({ audio: arrayBufferToBase64(audioBuffer), mime: 'audio/mpeg' });
+        return jsonResponse({ audio: arrayBufferToBase64(audioBytes.buffer), mime: 'audio/mpeg' });
       } catch (err) {
-        return jsonResponse({ error: err.message }, 500);
+        return jsonResponse({ error: err.message }, 502);
       }
     }
 
