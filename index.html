@@ -1335,6 +1335,7 @@ async function handleCallUtterance(text) {
   try {
     const reply = await askPersona(activeTab, text);
     if (!callActive) return;
+    if (!reply) { if (callActive) listenOnce(); return; }
     if (activeTab === 'team') {
       speakSegmentsQueue(
         parseTeamReply(reply), 0,
@@ -1351,7 +1352,16 @@ async function handleCallUtterance(text) {
       speak(reply, () => { if (callActive) listenOnce(); }, true, activeTab);
     }
   } catch (err) {
-    if (callActive) listenOnce();
+    if (!callActive) return;
+    // Bei falschem/fehlendem Zugangscode zeigt askPersona schon den Login-
+    // Screen - der Anruf soll dann sauber enden statt endlos weiterzuhören.
+    if (err.message === 'Unauthorized') {
+      endCall();
+      return;
+    }
+    callCaptionEl.textContent = 'Verbindungsfehler: ' + err.message;
+    callStatusEl.textContent = 'Fehler';
+    setTimeout(() => { if (callActive) listenOnce(); }, 2000);
   }
 }
 
