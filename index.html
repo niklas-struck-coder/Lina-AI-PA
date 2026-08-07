@@ -33,6 +33,7 @@
     height: 100dvh;
     max-width: 560px;
     margin: 0 auto;
+    position: relative;
   }
   header {
     display: flex;
@@ -44,10 +45,12 @@
   }
   header img {
     width: 42px; height: 42px; border-radius: 12px;
+    object-fit: cover;
   }
   header .title { font-weight: 700; font-size: 18px; }
   header .status { font-size: 12px; color: var(--teal); }
   header .status.offline { color: #ff8a80; }
+  header .actions { display: flex; gap: 8px; flex-shrink: 0; }
 
   #messages {
     flex: 1;
@@ -57,8 +60,24 @@
     flex-direction: column;
     gap: 10px;
   }
+  .msg-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    max-width: 88%;
+    animation: fadeInUp 0.25s ease;
+  }
+  .msg-row.lina { align-self: flex-start; }
+  .msg-row.user { align-self: flex-end; }
+  .msg-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    flex-shrink: 0; object-fit: cover;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   .msg {
-    max-width: 80%;
     padding: 10px 14px;
     border-radius: 16px;
     line-height: 1.4;
@@ -66,12 +85,10 @@
     white-space: pre-wrap;
   }
   .msg.lina {
-    align-self: flex-start;
     background: var(--navy-light);
     border-bottom-left-radius: 4px;
   }
   .msg.user {
-    align-self: flex-end;
     background: var(--teal);
     color: #04211c;
     border-bottom-right-radius: 4px;
@@ -95,7 +112,7 @@
     font-size: 15px;
     outline: none;
   }
-  button#send, button#mute {
+  button#send, button#mute, button#call {
     background: var(--teal);
     color: #04211c;
     border: none;
@@ -105,7 +122,7 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  button#mute {
+  button#mute, button#call {
     background: transparent;
     border: 1px solid rgba(255,255,255,0.15);
     color: var(--text);
@@ -124,6 +141,52 @@
     border-radius: 6px;
     color: var(--gold);
   }
+
+  /* ---- Anruf-Overlay ---- */
+  #callOverlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 30%, var(--navy-light), var(--navy) 75%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 56px 24px 44px;
+    z-index: 50;
+    text-align: center;
+  }
+  #callOverlay.active { display: flex; }
+  .call-avatar-wrap { position: relative; margin-top: 32px; }
+  .call-avatar {
+    width: 140px; height: 140px; border-radius: 50%;
+    object-fit: cover; position: relative; z-index: 2;
+    border: 3px solid rgba(255,255,255,0.15);
+  }
+  .call-avatar-ring {
+    position: absolute; inset: -14px; border-radius: 50%;
+    border: 2px solid var(--teal); opacity: 0;
+  }
+  #callOverlay.listening .call-avatar-ring {
+    animation: pulse-ring 1.6s ease-out infinite; opacity: 1;
+  }
+  #callOverlay.speaking .call-avatar-ring {
+    animation: pulse-ring 0.9s ease-out infinite; opacity: 1; border-color: var(--gold);
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.35); opacity: 0; }
+  }
+  .call-name { margin-top: 20px; font-size: 22px; font-weight: 700; }
+  .call-status { margin-top: 6px; font-size: 14px; color: var(--muted); min-height: 20px; }
+  .call-caption {
+    margin-top: 24px; font-size: 16px; text-align: center;
+    color: var(--text); min-height: 48px; max-width: 420px; line-height: 1.4;
+  }
+  .hangup-btn {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: #ff5252; color: white; border: none; font-size: 26px;
+    cursor: pointer; box-shadow: 0 4px 16px rgba(255,82,82,0.4);
+  }
 </style>
 </head>
 <body>
@@ -135,7 +198,10 @@
       <div class="status" id="status">bereit</div>
     </div>
     <div style="flex:1"></div>
-    <button id="mute" title="Stimme an/aus">🔊</button>
+    <div class="actions">
+      <button id="call" title="Anrufen">📞</button>
+      <button id="mute" title="Stimme an/aus">🔊</button>
+    </div>
   </header>
 
   <div id="messages"></div>
@@ -149,6 +215,19 @@
     <input id="input" type="text" placeholder="Schreib Lina etwas…" autocomplete="off">
     <button id="send" type="submit">➤</button>
   </form>
+
+  <div id="callOverlay">
+    <div class="call-avatar-wrap">
+      <div class="call-avatar-ring"></div>
+      <img src="icon-512.png" class="call-avatar" alt="Lina">
+    </div>
+    <div>
+      <div class="call-name">Lina</div>
+      <div class="call-status" id="callStatus">Verbindet…</div>
+      <div class="call-caption" id="callCaption"></div>
+    </div>
+    <button id="hangup" class="hangup-btn" title="Auflegen">📵</button>
+  </div>
 </div>
 
 <script>
@@ -157,7 +236,7 @@
 // const WORKER_URL = "https://lina-proxy.dein-name.workers.dev";
 const WORKER_URL = "PASTE_YOUR_WORKER_URL_HERE";
 
-const LINA_GREETING = "Hey, ich bin Lina 👋 Frag mich einfach etwas.";
+const LINA_GREETING = "Hey, ich bin Lina 👋 Frag mich einfach etwas, oder ruf mich an.";
 
 const messagesEl = document.getElementById('messages');
 const form = document.getElementById('composer');
@@ -187,17 +266,32 @@ function renderAll() {
 }
 
 function addBubble(who, text, scroll = true) {
-  const div = document.createElement('div');
-  div.className = 'msg ' + who;
-  div.textContent = text;
-  messagesEl.appendChild(div);
+  const classes = who.split(' ');
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + who;
+
+  if (classes[0] === 'lina') {
+    const avatar = document.createElement('img');
+    avatar.src = 'icon-192.png';
+    avatar.alt = 'Lina';
+    avatar.className = 'msg-avatar';
+    row.appendChild(avatar);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg ' + who;
+  bubble.textContent = text;
+  row.appendChild(bubble);
+
+  messagesEl.appendChild(row);
   if (scroll) messagesEl.scrollTop = messagesEl.scrollHeight;
-  return div;
+  return row;
 }
 
-function speak(text) {
-  if (muted) return;
-  if (!('speechSynthesis' in window)) return;
+// speak(text, onEnd, force) - force=true spricht auch wenn stummgeschaltet (Anruf-Modus)
+function speak(text, onEnd, force = false) {
+  if (muted && !force) { if (onEnd) onEnd(); return; }
+  if (!('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'de-DE';
@@ -209,6 +303,7 @@ function speak(text) {
     femaleNames.some(n => v.name.toLowerCase().includes(n)));
   if (!voice) voice = voices.find(v => v.lang.toLowerCase().startsWith('de'));
   if (voice) utter.voice = voice;
+  if (onEnd) utter.onend = onEnd;
   window.speechSynthesis.speak(utter);
 }
 
@@ -229,11 +324,8 @@ muteBtn.addEventListener('click', () => {
   if (muted) window.speechSynthesis.cancel();
 });
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
+// ---- Nachricht an Lina schicken (gemeinsam für Text-Chat und Anruf) ----
+async function askLina(text) {
   addBubble('user', text);
   history.push({ role: 'user', content: text });
   localStorage.setItem('lina_history', JSON.stringify(history));
@@ -254,18 +346,144 @@ form.addEventListener('submit', async (e) => {
     addBubble('lina', reply);
     history.push({ role: 'assistant', content: reply });
     localStorage.setItem('lina_history', JSON.stringify(history));
-    speak(reply);
     statusEl.textContent = 'bereit';
     statusEl.classList.remove('offline');
+    return reply;
   } catch (err) {
     thinkingBubble.remove();
     addBubble('lina', 'Hmm, ich konnte gerade nicht antworten. (' + err.message + ')');
     statusEl.textContent = 'Verbindungsfehler';
     statusEl.classList.add('offline');
+    throw err;
+  }
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  try {
+    const reply = await askLina(text);
+    speak(reply);
+  } catch (err) {
+    // Fehler wurde bereits als Bubble angezeigt
   }
 });
 
 renderAll();
+
+// ---- Anruf-Modus (Mikrofon + gesprochene Antworten) ----
+const callBtn = document.getElementById('call');
+const callOverlay = document.getElementById('callOverlay');
+const callStatusEl = document.getElementById('callStatus');
+const callCaptionEl = document.getElementById('callCaption');
+const hangupBtn = document.getElementById('hangup');
+
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let callActive = false;
+
+function setCallState(state) {
+  callOverlay.classList.remove('listening', 'speaking', 'idle');
+  callOverlay.classList.add(state);
+  const labels = { listening: 'Hört zu…', speaking: 'Lina spricht…', idle: 'Verbunden' };
+  callStatusEl.textContent = labels[state] || '';
+}
+
+function startCall() {
+  if (!SpeechRecognitionCtor) {
+    alert('Sprachanrufe werden von diesem Browser nicht unterstützt. Bitte Chrome oder Edge verwenden (auf dem iPhone: Safari unterstützt das leider nicht zuverlässig).');
+    return;
+  }
+  if (WORKER_URL.includes('PASTE_YOUR_WORKER_URL_HERE')) {
+    alert('Bitte zuerst WORKER_URL im Quellcode einrichten (siehe README).');
+    return;
+  }
+  callActive = true;
+  callOverlay.classList.add('active');
+  callCaptionEl.textContent = '';
+  window.speechSynthesis.cancel();
+  listenOnce();
+}
+
+function endCall() {
+  callActive = false;
+  callOverlay.classList.remove('active', 'listening', 'speaking', 'idle');
+  if (recognition) { try { recognition.stop(); } catch (e) {} }
+  window.speechSynthesis.cancel();
+}
+
+function listenOnce() {
+  if (!callActive) return;
+  recognition = new SpeechRecognitionCtor();
+  recognition.lang = 'de-DE';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  let handled = false;
+
+  setCallState('listening');
+  callCaptionEl.textContent = '';
+
+  recognition.onresult = (event) => {
+    let interim = '', final = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) final += transcript;
+      else interim += transcript;
+    }
+    callCaptionEl.textContent = final || interim;
+    if (final && !handled) {
+      handled = true;
+      recognition.stop();
+      handleCallUtterance(final.trim());
+    }
+  };
+
+  recognition.onerror = (event) => {
+    if (!callActive) return;
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      handled = true;
+      callStatusEl.textContent = 'Mikrofon-Zugriff verweigert';
+      endCall();
+      alert('Mikrofonzugriff wurde verweigert. Bitte in den Browser-Einstellungen für diese Seite erlauben.');
+      return;
+    }
+    if (event.error === 'no-speech' || event.error === 'aborted') {
+      handled = true;
+      if (callActive) listenOnce();
+      return;
+    }
+    handled = true;
+    callStatusEl.textContent = 'Fehler: ' + event.error;
+    if (callActive) setTimeout(() => { if (callActive) listenOnce(); }, 1500);
+  };
+
+  recognition.onend = () => {
+    if (!handled && callActive) listenOnce();
+  };
+
+  try { recognition.start(); } catch (e) {}
+}
+
+async function handleCallUtterance(text) {
+  if (!text) { if (callActive) listenOnce(); return; }
+  callCaptionEl.textContent = text;
+  setCallState('idle');
+  callStatusEl.textContent = 'Lina denkt nach…';
+  try {
+    const reply = await askLina(text);
+    if (!callActive) return;
+    callCaptionEl.textContent = reply;
+    setCallState('speaking');
+    speak(reply, () => { if (callActive) listenOnce(); }, true);
+  } catch (err) {
+    if (callActive) listenOnce();
+  }
+}
+
+callBtn.addEventListener('click', startCall);
+hangupBtn.addEventListener('click', endCall);
 
 // PWA: Service Worker optional weggelassen (keine Offline-Pflicht für diesen Zweck)
 </script>
