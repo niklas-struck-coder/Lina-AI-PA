@@ -536,30 +536,32 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 // voice: bevorzugte Stimmnamen (je nachdem was Browser/Gerät anbietet) +
 // Tonhöhe/Tempo als verlässlicher Unterschied, falls nur 1-2 Stimmen
 // verfügbar sind (Web Speech API kann pro Gerät stark variieren).
+// "stimme X" matcht die auf dem Mac heruntergeladenen Siri-Stimmen 1-4 -
+// jede Person bekommt eine eigene feste Nummer zugewiesen.
 const PERSONAS = {
   lina: {
     name: 'Lina', tabLabel: '💬 Lina', role: 'Persönliche Assistentin',
     avatarType: 'img', avatar: 'icon-192.png', color: '#00A98F',
     greeting: 'Hey, ich bin Lina 👋 Frag mich einfach etwas, schick mir ein Bild, oder ruf mich an.',
-    voice: { names: ['petra', 'anna', 'helena', 'female', 'samantha', 'google deutsch', 'martina', 'katja'], pitch: 1.15, rate: 1.02 },
+    voice: { names: ['stimme 1', 'petra', 'anna', 'helena', 'female', 'samantha', 'google deutsch', 'martina', 'katja'], pitch: 1.1, rate: 1.0 },
   },
   it: {
     name: 'IT-Chef', tabLabel: '🖥️ IT-Chef', role: 'Technik & Entwicklung',
     avatarType: 'emoji', avatar: '🖥️', color: '#3E6FB0',
     greeting: 'IT-Chef hier 🖥️ Frag mich zu Code, Architektur oder travix.ai-Technik.',
-    voice: { names: ['markus', 'yannick', 'stefan', 'conrad', 'daniel', 'male', 'google deutsch'], pitch: 0.82, rate: 0.98 },
+    voice: { names: ['stimme 2', 'markus', 'yannick', 'stefan', 'conrad', 'daniel', 'male', 'google deutsch'], pitch: 0.9, rate: 0.98 },
   },
   marketing: {
     name: 'Marketing-Chef', tabLabel: '📈 Marketing', role: 'Marketing & Strategie',
     avatarType: 'emoji', avatar: '📈', color: '#D98A2B',
     greeting: 'Marketing-Chef hier 📈 Lass uns über Positionierung, Zielgruppen oder Kampagnen sprechen.',
-    voice: { names: ['yannick', 'markus', 'stefan', 'conrad', 'daniel', 'male'], pitch: 1.05, rate: 1.15 },
+    voice: { names: ['stimme 4', 'yannick', 'markus', 'stefan', 'conrad', 'daniel', 'male'], pitch: 1.05, rate: 1.1 },
   },
   support: {
     name: 'Support-Chef', tabLabel: '🎧 Support', role: 'Kundenservice & Support',
     avatarType: 'emoji', avatar: '🎧', color: '#8E5FC7',
     greeting: 'Support-Chef hier 🎧 Frag mich zu Kundenerfahrung, Support-Prozessen oder Nutzerproblemen.',
-    voice: { names: ['anna', 'helena', 'petra', 'female', 'martina', 'katja'], pitch: 0.92, rate: 0.94 },
+    voice: { names: ['stimme 3', 'anna', 'helena', 'petra', 'female', 'martina', 'katja'], pitch: 0.95, rate: 0.96 },
   },
   team: {
     name: 'Team-Meeting', tabLabel: '👥 Team-Meeting', role: 'Alle zusammen',
