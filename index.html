@@ -204,6 +204,15 @@
     flex-shrink: 0;
     padding: 6px;
   }
+  .settings-voices {
+    background: var(--white);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 13px;
+  }
+  .settings-voices-title { font-weight: 700; margin-bottom: 6px; }
+  .settings-voices-list { color: var(--muted); line-height: 1.5; word-break: break-word; }
 
   #messages {
     flex: 1;
@@ -869,7 +878,9 @@ function speakTeamReply(text) {
 }
 
 if ('speechSynthesis' in window) {
-  window.speechSynthesis.onvoiceschanged = () => {};
+  window.speechSynthesis.onvoiceschanged = () => {
+    if (settingsScreen.classList.contains('active')) renderSettings();
+  };
 }
 
 function updateMuteBtn() {
@@ -1013,6 +1024,30 @@ function renderSettings() {
     row.appendChild(resetBtn);
     settingsList.appendChild(row);
   });
+
+  renderVoiceDiagnostics();
+}
+
+function renderVoiceDiagnostics() {
+  const box = document.createElement('div');
+  box.className = 'settings-voices';
+
+  const title = document.createElement('div');
+  title.className = 'settings-voices-title';
+  title.textContent = 'Verfügbare deutsche Stimmen auf diesem Gerät';
+  box.appendChild(title);
+
+  const list = document.createElement('div');
+  list.className = 'settings-voices-list';
+  const voices = ('speechSynthesis' in window)
+    ? window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith('de'))
+    : [];
+  list.textContent = voices.length
+    ? voices.map(v => v.name).join(', ')
+    : 'Keine gefunden (falls du gerade neue Stimmen heruntergeladen hast: Einstellungen einmal schließen und neu öffnen).';
+  box.appendChild(list);
+
+  settingsList.appendChild(box);
 }
 
 function openSettings() {
