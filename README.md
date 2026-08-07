@@ -20,6 +20,21 @@ Der Worker nutzt **Google Gemini** (kostenloses Kontingent, keine Kreditkarte n�
 
 Das kostenlose Kontingent von Gemini reicht für normale, alltägliche PA-Nutzung locker aus. Falls du später doch lieber Claude/Anthropic nutzen willst, sag einfach Bescheid — der Worker lässt sich zurückbauen.
 
+## Teil 1b: Kalender-Kontext (optional, experimentell)
+
+Der Worker kann Lina einen groben Ausschnitt aus deinem Reclaim-Kalender mitgeben.
+**Wichtig:** Das läuft über einen inoffiziellen, undokumentierten Reclaim-Endpunkt
+(Reclaims öffentliche API deckt offiziell nur Tasks/Habits ab, keine Kalender-Events).
+Das kann jederzeit ohne Vorwarnung aufhören zu funktionieren — der Worker fängt das
+aber ab, dann antwortet Lina einfach ohne Kalenderkontext, nichts bricht dabei ab.
+
+1. Gehe zu [app.reclaim.ai/settings/developer](https://app.reclaim.ai/settings/developer) und erstelle einen API-Key.
+2. In Cloudflare, bei deinem Worker unter **Settings → Variables and Secrets**, eine weitere Variable hinzufügen:
+   - Name: `RECLAIM_API_KEY`
+   - Wert: der Key aus Schritt 1
+   - Typ: **Secret**
+3. Fertig — Lina bekommt jetzt bei jeder Nachricht automatisch einen Kalenderausschnitt der nächsten ca. 24–30h mitgeliefert (nur lesend, keine Schreibrechte, Zeiten in UTC).
+
 ## Teil 2: Website auf GitHub Pages
 
 1. Auf [github.com](https://github.com) → **New repository** → Name z. B. `lina-pa`, Sichtbarkeit **Public**, "Add a README" NICHT anhaken.
