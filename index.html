@@ -855,6 +855,24 @@ function addBubble(who, content, scroll = true, personaKey = 'lina', label = nul
 // Kontingent automatisch auf die Browser-Stimme zurück.
 let currentAudio = null;
 
+// iOS/Safari erlaubt audio.play() nur, wenn es direkt aus einem Fingertipp
+// ausgelöst wird. Im Anruf-Modus kommt die Antwort aber über Spracherkennung
+// (kein Tap), also blockiert Safari die echte Stimme und die App fällt
+// still auf die Browser-Ersatzstimme zurück. Fix: beim allerersten Tap
+// irgendwo auf der Seite ein winziges stummes Audio abspielen - das
+// "entsperrt" programmatisches audio.play() für den Rest der Sitzung.
+let audioUnlocked = false;
+function unlockAudioPlayback() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try {
+    const silence = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
+    silence.play().catch(() => {});
+  } catch (e) {}
+}
+document.addEventListener('click', unlockAudioPlayback, { once: true });
+document.addEventListener('touchend', unlockAudioPlayback, { once: true });
+
 // Stoppt jede laufende Sprachausgabe sofort (Groq-Audio + Browser-Fallback) -
 // zentrale Stelle, damit "Auflegen" und "Unterbrechen beim Reinreden" nie
 // vergessen, eine der beiden Audioquellen zu stoppen.
