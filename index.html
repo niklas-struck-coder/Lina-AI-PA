@@ -7,23 +7,26 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lina">
-<meta name="theme-color" content="#0A2342">
+<meta name="theme-color" content="#FAF6EF">
 <style>
   :root {
-    --navy: #0A2342;
-    --navy-light: #12315c;
-    --teal: #00C2A8;
-    --gold: #F4B400;
-    --text: #EAF2F8;
-    --muted: #7f96ad;
+    --cream: #FAF6EF;
+    --cream-panel: #F0E7D6;
+    --white: #FFFFFF;
+    --ink: #2B2A28;
+    --muted: #948773;
+    --teal: #00A98F;
+    --teal-ink: #04211c;
+    --gold: #A8600A;
+    --danger: #E4573D;
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; height: 100%;
-    background: var(--navy);
-    color: var(--text);
+    background: var(--cream);
+    color: var(--ink);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
   #app {
@@ -34,13 +37,16 @@
     max-width: 560px;
     margin: 0 auto;
     position: relative;
+    background: var(--cream);
   }
   header {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: var(--white);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 1px 3px rgba(43,42,40,0.04);
     flex-shrink: 0;
   }
   header img {
@@ -49,7 +55,7 @@
   }
   header .title { font-weight: 700; font-size: 18px; }
   header .status { font-size: 12px; color: var(--teal); }
-  header .status.offline { color: #ff8a80; }
+  header .status.offline { color: var(--danger); }
   header .actions { display: flex; gap: 8px; flex-shrink: 0; }
 
   #messages {
@@ -82,50 +88,86 @@
     border-radius: 16px;
     line-height: 1.4;
     font-size: 15px;
-    white-space: pre-wrap;
   }
   .msg.lina {
-    background: var(--navy-light);
+    background: var(--white);
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 1px 2px rgba(43,42,40,0.05);
+    color: var(--ink);
     border-bottom-left-radius: 4px;
   }
   .msg.user {
     background: var(--teal);
-    color: #04211c;
+    color: #ffffff;
     border-bottom-right-radius: 4px;
   }
   .msg.thinking { color: var(--muted); font-style: italic; }
+  .msg-caption { white-space: pre-wrap; }
+  .msg.has-image { padding: 6px; }
+  .msg.has-image .msg-caption { padding: 8px 6px 2px; }
+  .msg-image {
+    display: block;
+    max-width: 220px;
+    width: 100%;
+    border-radius: 12px;
+  }
+
+  #imagePreview {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--cream-panel);
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  #imagePreview img {
+    width: 48px; height: 48px; border-radius: 10px; object-fit: cover;
+  }
+  #imagePreview span { font-size: 13px; color: var(--muted); flex: 1; }
+  #removeImage {
+    background: rgba(0,0,0,0.08);
+    border: none;
+    border-radius: 50%;
+    width: 26px; height: 26px;
+    cursor: pointer;
+    color: var(--ink);
+    font-size: 14px;
+  }
 
   form#composer {
     display: flex;
     gap: 8px;
     padding: 12px;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    background: var(--white);
+    border-top: 1px solid rgba(0,0,0,0.06);
     flex-shrink: 0;
   }
   #input {
     flex: 1;
-    background: var(--navy-light);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: var(--text);
+    background: var(--cream-panel);
+    border: 1px solid rgba(0,0,0,0.06);
+    color: var(--ink);
     border-radius: 999px;
     padding: 12px 16px;
     font-size: 15px;
     outline: none;
   }
-  button#send, button#mute, button#call {
-    background: var(--teal);
-    color: #04211c;
-    border: none;
+  button#send, button#mute, button#call, button#attach {
     border-radius: 999px;
     width: 46px; height: 46px;
     font-size: 18px;
     cursor: pointer;
     flex-shrink: 0;
+    border: none;
   }
-  button#mute, button#call {
+  button#send {
+    background: var(--teal);
+    color: #ffffff;
+  }
+  button#mute, button#call, button#attach {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.15);
-    color: var(--text);
+    border: 1px solid rgba(0,0,0,0.1);
+    color: var(--ink);
   }
   button#mute.muted { color: var(--muted); }
 
@@ -136,7 +178,7 @@
     line-height: 1.5;
   }
   #setup code {
-    background: var(--navy-light);
+    background: var(--cream-panel);
     padding: 2px 6px;
     border-radius: 6px;
     color: var(--gold);
@@ -146,7 +188,7 @@
   #callOverlay {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 50% 30%, var(--navy-light), var(--navy) 75%);
+    background: radial-gradient(circle at 50% 30%, var(--white), var(--cream) 75%);
     display: none;
     flex-direction: column;
     align-items: center;
@@ -160,7 +202,8 @@
   .call-avatar {
     width: 140px; height: 140px; border-radius: 50%;
     object-fit: cover; position: relative; z-index: 2;
-    border: 3px solid rgba(255,255,255,0.15);
+    border: 3px solid rgba(0,0,0,0.06);
+    box-shadow: 0 4px 20px rgba(43,42,40,0.12);
   }
   .call-avatar-ring {
     position: absolute; inset: -14px; border-radius: 50%;
@@ -180,12 +223,12 @@
   .call-status { margin-top: 6px; font-size: 14px; color: var(--muted); min-height: 20px; }
   .call-caption {
     margin-top: 24px; font-size: 16px; text-align: center;
-    color: var(--text); min-height: 48px; max-width: 420px; line-height: 1.4;
+    color: var(--ink); min-height: 48px; max-width: 420px; line-height: 1.4;
   }
   .hangup-btn {
     width: 64px; height: 64px; border-radius: 50%;
-    background: #ff5252; color: white; border: none; font-size: 26px;
-    cursor: pointer; box-shadow: 0 4px 16px rgba(255,82,82,0.4);
+    background: var(--danger); color: white; border: none; font-size: 26px;
+    cursor: pointer; box-shadow: 0 4px 16px rgba(228,87,61,0.35);
   }
 </style>
 </head>
@@ -211,7 +254,15 @@
     die Adresse deines Cloudflare-Worker-Proxys ein (siehe Anleitung).
   </div>
 
+  <div id="imagePreview">
+    <img id="imagePreviewImg" alt="Vorschau">
+    <span>Bild wird mitgeschickt</span>
+    <button type="button" id="removeImage" title="Entfernen">✕</button>
+  </div>
+
   <form id="composer">
+    <input type="file" id="imageInput" accept="image/*" hidden>
+    <button type="button" id="attach" title="Bild senden">🖼️</button>
     <input id="input" type="text" placeholder="Schreib Lina etwas…" autocomplete="off">
     <button id="send" type="submit">➤</button>
   </form>
@@ -236,7 +287,8 @@
 // const WORKER_URL = "https://lina-proxy.dein-name.workers.dev";
 const WORKER_URL = "PASTE_YOUR_WORKER_URL_HERE";
 
-const LINA_GREETING = "Hey, ich bin Lina 👋 Frag mich einfach etwas, oder ruf mich an.";
+const LINA_GREETING = "Hey, ich bin Lina 👋 Frag mich einfach etwas, schick mir ein Bild, oder ruf mich an.";
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 const messagesEl = document.getElementById('messages');
 const form = document.getElementById('composer');
@@ -244,9 +296,15 @@ const input = document.getElementById('input');
 const statusEl = document.getElementById('status');
 const muteBtn = document.getElementById('mute');
 const setupEl = document.getElementById('setup');
+const attachBtn = document.getElementById('attach');
+const imageInput = document.getElementById('imageInput');
+const imagePreview = document.getElementById('imagePreview');
+const imagePreviewImg = document.getElementById('imagePreviewImg');
+const removeImageBtn = document.getElementById('removeImage');
 
 let history = JSON.parse(localStorage.getItem('lina_history') || '[]');
 let muted = localStorage.getItem('lina_muted') === 'true';
+let pendingImage = null; // { mediaType, base64, dataUrl }
 updateMuteBtn();
 
 if (WORKER_URL.includes('PASTE_YOUR_WORKER_URL_HERE')) {
@@ -255,17 +313,42 @@ if (WORKER_URL.includes('PASTE_YOUR_WORKER_URL_HERE')) {
   statusEl.classList.add('offline');
 }
 
+function saveHistory() {
+  try {
+    localStorage.setItem('lina_history', JSON.stringify(history));
+  } catch (e) {
+    // Speicher voll (meist durch viele Bilder) - älteste Nachrichten verwerfen und erneut versuchen
+    while (history.length > 4) {
+      history.shift();
+      try { localStorage.setItem('lina_history', JSON.stringify(history)); return; } catch (e2) {}
+    }
+  }
+}
+
+function contentToDisplay(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    const textBlock = content.find(b => b.type === 'text');
+    const imageBlock = content.find(b => b.type === 'image');
+    return {
+      text: textBlock ? textBlock.text : '',
+      imageDataUrl: imageBlock ? ('data:' + imageBlock.source.media_type + ';base64,' + imageBlock.source.data) : null,
+    };
+  }
+  return '';
+}
+
 function renderAll() {
   messagesEl.innerHTML = '';
   if (history.length === 0) {
     addBubble('lina', LINA_GREETING, false);
   } else {
-    history.forEach(m => addBubble(m.role === 'assistant' ? 'lina' : 'user', m.content, false));
+    history.forEach(m => addBubble(m.role === 'assistant' ? 'lina' : 'user', contentToDisplay(m.content), false));
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-function addBubble(who, text, scroll = true) {
+function addBubble(who, content, scroll = true) {
   const classes = who.split(' ');
   const row = document.createElement('div');
   row.className = 'msg-row ' + who;
@@ -280,9 +363,26 @@ function addBubble(who, text, scroll = true) {
 
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + who;
-  bubble.textContent = text;
-  row.appendChild(bubble);
 
+  const text = typeof content === 'string' ? content : (content.text || '');
+  const imageDataUrl = typeof content === 'string' ? null : content.imageDataUrl;
+
+  if (imageDataUrl) {
+    bubble.classList.add('has-image');
+    const img = document.createElement('img');
+    img.src = imageDataUrl;
+    img.className = 'msg-image';
+    img.alt = 'Bild';
+    bubble.appendChild(img);
+  }
+  if (text || !imageDataUrl) {
+    const caption = document.createElement('div');
+    caption.className = 'msg-caption';
+    caption.textContent = text;
+    bubble.appendChild(caption);
+  }
+
+  row.appendChild(bubble);
   messagesEl.appendChild(row);
   if (scroll) messagesEl.scrollTop = messagesEl.scrollHeight;
   return row;
@@ -324,11 +424,44 @@ muteBtn.addEventListener('click', () => {
   if (muted) window.speechSynthesis.cancel();
 });
 
+// ---- Bild-Anhang ----
+attachBtn.addEventListener('click', () => imageInput.click());
+
+imageInput.addEventListener('change', () => {
+  const file = imageInput.files[0];
+  imageInput.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    alert('Bitte eine Bilddatei auswählen.');
+    return;
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    alert('Das Bild ist zu groß (max. 4 MB).');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    const base64 = dataUrl.split(',')[1];
+    pendingImage = { mediaType: file.type, base64, dataUrl };
+    imagePreviewImg.src = dataUrl;
+    imagePreview.style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+});
+
+removeImageBtn.addEventListener('click', () => {
+  pendingImage = null;
+  imagePreview.style.display = 'none';
+});
+
 // ---- Nachricht an Lina schicken (gemeinsam für Text-Chat und Anruf) ----
-async function askLina(text) {
-  addBubble('user', text);
-  history.push({ role: 'user', content: text });
-  localStorage.setItem('lina_history', JSON.stringify(history));
+// userContent: was an die API geschickt wird (String oder Content-Block-Array)
+// displayContent: was als Chat-Bubble gerendert wird (String oder {text, imageDataUrl})
+async function askLina(userContent, displayContent) {
+  addBubble('user', displayContent !== undefined ? displayContent : userContent);
+  history.push({ role: 'user', content: userContent });
+  saveHistory();
 
   const thinkingBubble = addBubble('lina thinking', 'Lina denkt nach …');
   statusEl.textContent = 'tippt…';
@@ -345,7 +478,7 @@ async function askLina(text) {
     const reply = data.reply || '(keine Antwort erhalten)';
     addBubble('lina', reply);
     history.push({ role: 'assistant', content: reply });
-    localStorage.setItem('lina_history', JSON.stringify(history));
+    saveHistory();
     statusEl.textContent = 'bereit';
     statusEl.classList.remove('offline');
     return reply;
@@ -361,10 +494,25 @@ async function askLina(text) {
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = input.value.trim();
-  if (!text) return;
+  if (!text && !pendingImage) return;
   input.value = '';
+
+  let userContent, displayContent;
+  if (pendingImage) {
+    userContent = [
+      { type: 'image', source: { type: 'base64', media_type: pendingImage.mediaType, data: pendingImage.base64 } },
+    ];
+    if (text) userContent.push({ type: 'text', text });
+    displayContent = { text, imageDataUrl: pendingImage.dataUrl };
+    pendingImage = null;
+    imagePreview.style.display = 'none';
+  } else {
+    userContent = text;
+    displayContent = text;
+  }
+
   try {
-    const reply = await askLina(text);
+    const reply = await askLina(userContent, displayContent);
     speak(reply);
   } catch (err) {
     // Fehler wurde bereits als Bubble angezeigt
