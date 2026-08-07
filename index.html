@@ -855,9 +855,17 @@ function addBubble(who, content, scroll = true, personaKey = 'lina', label = nul
 // Kontingent automatisch auf die Browser-Stimme zurück.
 let currentAudio = null;
 
+// Stoppt jede laufende Sprachausgabe sofort (Groq-Audio + Browser-Fallback) -
+// zentrale Stelle, damit "Auflegen" und "Unterbrechen beim Reinreden" nie
+// vergessen, eine der beiden Audioquellen zu stoppen.
+function stopSpeaking() {
+  if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+
 async function speak(text, onEnd, force = false, personaKey = 'lina') {
   if (muted && !force) { if (onEnd) onEnd(); return; }
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  stopSpeaking();
 
   try {
     const res = await fetch(WORKER_URL, {
@@ -929,7 +937,7 @@ muteBtn.addEventListener('click', () => {
   muted = !muted;
   localStorage.setItem('lina_muted', muted);
   updateMuteBtn();
-  if (muted) window.speechSynthesis.cancel();
+  if (muted) stopSpeaking();
 });
 
 // ---- Menü-Schublade ----
@@ -1294,6 +1302,44 @@ const hangupBtn = document.getElementById('hangup');
 const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let callActive = false;
+let bargeInRecognition = null;
+
+// Läuft parallel, während die KI spricht, und hört NUR mit, um zu merken,
+// ob Ni reinredet ("Barge-in"). Sobald etwas Verständliches ankommt, wird
+// die KI-Stimme sofort gestoppt und auf normales Zuhören umgeschaltet.
+function stopBargeInListener() {
+  if (bargeInRecognition) {
+    const r = bargeInRecognition;
+    bargeInRecognition = null;
+    r.onresult = null;
+    r.onend = null;
+    r.onerror = null;
+    try { r.stop(); } catch (e) {}
+  }
+}
+
+function startBargeInListener() {
+  if (!SpeechRecognitionCtor || !callActive) return;
+  stopBargeInListener();
+  const r = new SpeechRecognitionCtor();
+  bargeInRecognition = r;
+  r.lang = 'de-DE';
+  r.interimResults = true;
+  r.continuous = true;
+  r.onresult = (event) => {
+    const last = event.results[event.results.length - 1];
+    const transcript = last && last[0] ? last[0].transcript.trim() : '';
+    if (transcript.length > 1) {
+      r.onresult = null;
+      r.onend = () => { if (bargeInRecognition === r) bargeInRecognition = null; stopSpeaking(); if (callActive) listenOnce(); };
+      bargeInRecognition = null;
+      try { r.stop(); } catch (e) { stopSpeaking(); if (callActive) listenOnce(); }
+    }
+  };
+  r.onerror = () => {};
+  r.onend = () => { if (bargeInRecognition === r) bargeInRecognition = null; };
+  try { r.start(); } catch (e) { bargeInRecognition = null; }
+}
 
 function setCallState(state) {
   callOverlay.classList.remove('listening', 'speaking', 'idle');
@@ -1333,7 +1379,7 @@ function startCall() {
   setupCallChrome();
   callOverlay.classList.add('active');
   callCaptionEl.textContent = '';
-  window.speechSynthesis.cancel();
+  stopSpeaking();
   listenOnce();
 }
 
@@ -1341,7 +1387,8 @@ function endCall() {
   callActive = false;
   callOverlay.classList.remove('active', 'listening', 'speaking', 'idle');
   if (recognition) { try { recognition.stop(); } catch (e) {} }
-  window.speechSynthesis.cancel();
+  stopBargeInListener();
+  stopSpeaking();
 }
 
 function listenOnce() {
@@ -1406,9 +1453,10 @@ async function handleCallUtterance(text) {
     if (!callActive) return;
     if (!reply) { if (callActive) listenOnce(); return; }
     if (activeTab === 'team') {
+      startBargeInListener();
       speakSegmentsQueue(
         parseTeamReply(reply), 0,
-        () => { if (callActive) listenOnce(); },
+        () => { stopBargeInListener(); if (callActive) listenOnce(); },
         (seg, key) => {
           callCaptionEl.textContent = (seg.name ? getPersona(key).name + ': ' : '') + seg.text;
           setCallState('speaking');
@@ -1418,7 +1466,8 @@ async function handleCallUtterance(text) {
     } else {
       callCaptionEl.textContent = reply;
       setCallState('speaking');
-      speak(reply, () => { if (callActive) listenOnce(); }, true, activeTab);
+      startBargeInListener();
+      speak(reply, () => { stopBargeInListener(); if (callActive) listenOnce(); }, true, activeTab);
     }
   } catch (err) {
     if (!callActive) return;
