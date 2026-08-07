@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lina</title>
+<title>Lina & Team</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,9 +18,9 @@
     --ink: #2B2A28;
     --muted: #948773;
     --teal: #00A98F;
-    --teal-ink: #04211c;
     --gold: #A8600A;
     --danger: #E4573D;
+    --persona: #00A98F;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -49,14 +49,48 @@
     box-shadow: 0 1px 3px rgba(43,42,40,0.04);
     flex-shrink: 0;
   }
-  header img {
+  .avatar-badge {
     width: 42px; height: 42px; border-radius: 12px;
-    object-fit: cover;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0; overflow: hidden;
+    background: color-mix(in srgb, var(--persona) 18%, var(--cream-panel));
   }
+  .avatar-badge img { width: 100%; height: 100%; object-fit: cover; }
   header .title { font-weight: 700; font-size: 18px; }
   header .status { font-size: 12px; color: var(--teal); }
   header .status.offline { color: var(--danger); }
   header .actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  #tabs {
+    display: flex;
+    gap: 6px;
+    padding: 10px 16px;
+    overflow-x: auto;
+    background: var(--white);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+  }
+  #tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: var(--cream-panel);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab.active {
+    background: var(--tab-color, var(--teal));
+    color: #ffffff;
+    border-color: transparent;
+  }
 
   #messages {
     flex: 1;
@@ -75,10 +109,14 @@
   }
   .msg-row.lina { align-self: flex-start; }
   .msg-row.user { align-self: flex-end; }
-  .msg-avatar {
+  .msg-avatar-badge {
     width: 26px; height: 26px; border-radius: 50%;
-    flex-shrink: 0; object-fit: cover;
+    flex-shrink: 0; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    background: color-mix(in srgb, var(--badge-color, var(--teal)) 20%, var(--cream-panel));
   }
+  .msg-avatar-badge img { width: 100%; height: 100%; object-fit: cover; }
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
@@ -92,6 +130,7 @@
   .msg.lina {
     background: var(--white);
     border: 1px solid rgba(0,0,0,0.05);
+    border-left: 3px solid var(--badge-color, transparent);
     box-shadow: 0 1px 2px rgba(43,42,40,0.05);
     color: var(--ink);
     border-bottom-left-radius: 4px;
@@ -102,6 +141,7 @@
     border-bottom-right-radius: 4px;
   }
   .msg.thinking { color: var(--muted); font-style: italic; }
+  .msg-label { font-size: 11px; font-weight: 700; margin-bottom: 3px; color: var(--badge-color, var(--muted)); }
   .msg-caption { white-space: pre-wrap; }
   .msg.has-image { padding: 6px; }
   .msg.has-image .msg-caption { padding: 8px 6px 2px; }
@@ -205,6 +245,11 @@
     border: 3px solid rgba(0,0,0,0.06);
     box-shadow: 0 4px 20px rgba(43,42,40,0.12);
   }
+  .call-avatar.emoji {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 64px;
+    background: color-mix(in srgb, var(--persona) 18%, var(--white));
+  }
   .call-avatar-ring {
     position: absolute; inset: -14px; border-radius: 50%;
     border: 2px solid var(--teal); opacity: 0;
@@ -235,9 +280,9 @@
 <body>
 <div id="app">
   <header>
-    <img src="icon-192.png" alt="Lina">
+    <div id="headerAvatar" class="avatar-badge"></div>
     <div>
-      <div class="title">Lina</div>
+      <div class="title" id="headerTitle">Lina</div>
       <div class="status" id="status">bereit</div>
     </div>
     <div style="flex:1"></div>
@@ -247,10 +292,18 @@
     </div>
   </header>
 
+  <nav id="tabs">
+    <button class="tab" data-persona="lina">💬 Lina</button>
+    <button class="tab" data-persona="it">🖥️ IT-Chef</button>
+    <button class="tab" data-persona="marketing">📈 Marketing</button>
+    <button class="tab" data-persona="support">🎧 Support</button>
+    <button class="tab" data-persona="team">👥 Team-Meeting</button>
+  </nav>
+
   <div id="messages"></div>
 
   <div id="setup" style="display:none">
-    Um mit Lina zu sprechen, trage unten in <code>WORKER_URL</code> im Quellcode
+    Um mit dem Team zu sprechen, trage unten in <code>WORKER_URL</code> im Quellcode
     die Adresse deines Cloudflare-Worker-Proxys ein (siehe Anleitung).
   </div>
 
@@ -263,17 +316,17 @@
   <form id="composer">
     <input type="file" id="imageInput" accept="image/*" hidden>
     <button type="button" id="attach" title="Bild senden">🖼️</button>
-    <input id="input" type="text" placeholder="Schreib Lina etwas…" autocomplete="off">
+    <input id="input" type="text" placeholder="Schreib etwas…" autocomplete="off">
     <button id="send" type="submit">➤</button>
   </form>
 
   <div id="callOverlay">
     <div class="call-avatar-wrap">
       <div class="call-avatar-ring"></div>
-      <img src="icon-512.png" class="call-avatar" alt="Lina">
+      <div class="call-avatar" id="callAvatar"></div>
     </div>
     <div>
-      <div class="call-name">Lina</div>
+      <div class="call-name" id="callName">Lina</div>
       <div class="call-status" id="callStatus">Verbindet…</div>
       <div class="call-caption" id="callCaption"></div>
     </div>
@@ -286,9 +339,43 @@
 // Trag hier die URL deines Cloudflare-Worker-Proxys ein, z.B.:
 // const WORKER_URL = "https://lina-proxy.dein-name.workers.dev";
 const WORKER_URL = "PASTE_YOUR_WORKER_URL_HERE";
-
-const LINA_GREETING = "Hey, ich bin Lina 👋 Frag mich einfach etwas, schick mir ein Bild, oder ruf mich an.";
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+// ---- Team ----
+const PERSONAS = {
+  lina: {
+    name: 'Lina', tabLabel: '💬 Lina', role: 'Persönliche Assistentin',
+    avatarType: 'img', avatar: 'icon-192.png', color: '#00A98F',
+    greeting: 'Hey, ich bin Lina 👋 Frag mich einfach etwas, schick mir ein Bild, oder ruf mich an.',
+  },
+  it: {
+    name: 'IT-Chef', tabLabel: '🖥️ IT-Chef', role: 'Technik & Entwicklung',
+    avatarType: 'emoji', avatar: '🖥️', color: '#3E6FB0',
+    greeting: 'IT-Chef hier 🖥️ Frag mich zu Code, Architektur oder travix.ai-Technik.',
+  },
+  marketing: {
+    name: 'Marketing-Chef', tabLabel: '📈 Marketing', role: 'Marketing & Strategie',
+    avatarType: 'emoji', avatar: '📈', color: '#D98A2B',
+    greeting: 'Marketing-Chef hier 📈 Lass uns über Positionierung, Zielgruppen oder Kampagnen sprechen.',
+  },
+  support: {
+    name: 'Support-Chef', tabLabel: '🎧 Support', role: 'Kundenservice & Support',
+    avatarType: 'emoji', avatar: '🎧', color: '#8E5FC7',
+    greeting: 'Support-Chef hier 🎧 Frag mich zu Kundenerfahrung, Support-Prozessen oder Nutzerproblemen.',
+  },
+  team: {
+    name: 'Team-Meeting', tabLabel: '👥 Team-Meeting', role: 'Alle zusammen',
+    avatarType: 'emoji', avatar: '👥', color: '#4A4640',
+    greeting: 'Willkommen im Team-Meeting 👥 Frag etwas — die passenden Personen antworten.',
+  },
+};
+const PERSONA_ORDER = ['lina', 'it', 'marketing', 'support', 'team'];
+const NAME_TO_KEY = Object.fromEntries(
+  PERSONA_ORDER.filter(k => k !== 'team').map(k => [PERSONAS[k].name, k])
+);
+
+let activeTab = localStorage.getItem('lina_active_tab') || 'lina';
+if (!PERSONAS[activeTab]) activeTab = 'lina';
 
 const messagesEl = document.getElementById('messages');
 const form = document.getElementById('composer');
@@ -301,11 +388,12 @@ const imageInput = document.getElementById('imageInput');
 const imagePreview = document.getElementById('imagePreview');
 const imagePreviewImg = document.getElementById('imagePreviewImg');
 const removeImageBtn = document.getElementById('removeImage');
+const headerAvatarEl = document.getElementById('headerAvatar');
+const headerTitleEl = document.getElementById('headerTitle');
 
-let history = JSON.parse(localStorage.getItem('lina_history') || '[]');
+let histories = loadHistories();
 let muted = localStorage.getItem('lina_muted') === 'true';
 let pendingImage = null; // { mediaType, base64, dataUrl }
-updateMuteBtn();
 
 if (WORKER_URL.includes('PASTE_YOUR_WORKER_URL_HERE')) {
   setupEl.style.display = 'block';
@@ -313,16 +401,62 @@ if (WORKER_URL.includes('PASTE_YOUR_WORKER_URL_HERE')) {
   statusEl.classList.add('offline');
 }
 
-function saveHistory() {
+function loadHistories() {
+  const raw = localStorage.getItem('lina_team_history');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      PERSONA_ORDER.forEach(k => { if (!Array.isArray(parsed[k])) parsed[k] = []; });
+      return parsed;
+    } catch (e) { /* fällt durch auf leeren Zustand */ }
+  }
+  const base = { lina: [], it: [], marketing: [], support: [], team: [] };
+  // Migration von der alten Einzel-Lina-Version
+  const legacy = localStorage.getItem('lina_history');
+  if (legacy) {
+    try { base.lina = JSON.parse(legacy); } catch (e) {}
+  }
+  return base;
+}
+
+function saveHistories() {
   try {
-    localStorage.setItem('lina_history', JSON.stringify(history));
+    localStorage.setItem('lina_team_history', JSON.stringify(histories));
   } catch (e) {
-    // Speicher voll (meist durch viele Bilder) - älteste Nachrichten verwerfen und erneut versuchen
-    while (history.length > 4) {
-      history.shift();
-      try { localStorage.setItem('lina_history', JSON.stringify(history)); return; } catch (e2) {}
+    let trimmed = false;
+    PERSONA_ORDER.forEach(k => {
+      while (histories[k].length > 4) { histories[k].shift(); trimmed = true; }
+    });
+    if (trimmed) {
+      try { localStorage.setItem('lina_team_history', JSON.stringify(histories)); } catch (e2) {}
     }
   }
+}
+
+function setAvatarBadge(el, persona) {
+  el.innerHTML = '';
+  el.style.setProperty('--badge-color', persona.color);
+  if (persona.avatarType === 'img') {
+    const img = document.createElement('img');
+    img.src = persona.avatar;
+    img.alt = persona.name;
+    el.appendChild(img);
+  } else {
+    el.textContent = persona.avatar;
+  }
+}
+
+function applyPersonaChrome() {
+  const p = PERSONAS[activeTab];
+  document.documentElement.style.setProperty('--persona', p.color);
+  headerTitleEl.textContent = p.name;
+  setAvatarBadge(headerAvatarEl, p);
+  document.querySelectorAll('.tab').forEach(btn => {
+    const isActive = btn.dataset.persona === activeTab;
+    btn.classList.toggle('active', isActive);
+    btn.style.setProperty('--tab-color', PERSONAS[btn.dataset.persona].color);
+  });
+  input.placeholder = activeTab === 'team' ? 'Frag das ganze Team…' : `Schreib ${p.name} etwas…`;
 }
 
 function contentToDisplay(content) {
@@ -338,31 +472,85 @@ function contentToDisplay(content) {
   return '';
 }
 
-function renderAll() {
+// Zerlegt eine Team-Antwort ("Lina: ...\nIT-Chef: ...") in einzelne Wortmeldungen
+function parseTeamReply(text) {
+  const lines = String(text || '').split('\n');
+  const names = Object.keys(NAME_TO_KEY);
+  const segments = [];
+  let current = null;
+  lines.forEach(line => {
+    const match = names.find(name => line.startsWith(name + ':'));
+    if (match) {
+      if (current) segments.push(current);
+      current = { name: match, text: line.slice(match.length + 1).trim() };
+    } else if (current) {
+      current.text += (line ? (current.text ? '\n' : '') + line : '');
+    } else if (line.trim()) {
+      current = { name: null, text: line.trim() };
+    }
+  });
+  if (current) segments.push(current);
+  return segments.filter(s => s.text && s.text.trim());
+}
+
+function renderTeamReply(text, scroll = true) {
+  const segments = parseTeamReply(text);
+  if (segments.length === 0) {
+    addBubble('lina', text, scroll, 'team', PERSONAS.team.name);
+    return;
+  }
+  segments.forEach(seg => {
+    const key = seg.name ? (NAME_TO_KEY[seg.name] || 'team') : 'team';
+    addBubble('lina', seg.text, scroll, key, seg.name || PERSONAS.team.name);
+  });
+}
+
+function renderActiveTab() {
   messagesEl.innerHTML = '';
-  if (history.length === 0) {
-    addBubble('lina', LINA_GREETING, false);
+  const hist = histories[activeTab];
+  if (hist.length === 0) {
+    addBubble('lina', PERSONAS[activeTab].greeting, false, activeTab);
   } else {
-    history.forEach(m => addBubble(m.role === 'assistant' ? 'lina' : 'user', contentToDisplay(m.content), false));
+    hist.forEach(m => {
+      if (m.role === 'assistant') {
+        if (activeTab === 'team' && typeof m.content === 'string') {
+          renderTeamReply(m.content, false);
+        } else {
+          addBubble('lina', contentToDisplay(m.content), false, activeTab);
+        }
+      } else {
+        addBubble('user', contentToDisplay(m.content), false);
+      }
+    });
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-function addBubble(who, content, scroll = true) {
+function addBubble(who, content, scroll = true, personaKey = 'lina', label = null) {
   const classes = who.split(' ');
   const row = document.createElement('div');
   row.className = 'msg-row ' + who;
 
   if (classes[0] === 'lina') {
-    const avatar = document.createElement('img');
-    avatar.src = 'icon-192.png';
-    avatar.alt = 'Lina';
-    avatar.className = 'msg-avatar';
+    const p = PERSONAS[personaKey] || PERSONAS.lina;
+    const avatar = document.createElement('div');
+    avatar.className = 'msg-avatar-badge';
+    setAvatarBadge(avatar, p);
     row.appendChild(avatar);
   }
 
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + who;
+  if (classes[0] === 'lina') {
+    bubble.style.setProperty('--badge-color', (PERSONAS[personaKey] || PERSONAS.lina).color);
+  }
+
+  if (label) {
+    const labelEl = document.createElement('div');
+    labelEl.className = 'msg-label';
+    labelEl.textContent = label;
+    bubble.appendChild(labelEl);
+  }
 
   const text = typeof content === 'string' ? content : (content.text || '');
   const imageDataUrl = typeof content === 'string' ? null : content.imageDataUrl;
@@ -395,7 +583,7 @@ function speak(text, onEnd, force = false) {
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'de-DE';
-  utter.pitch = 1.15;
+  utter.pitch = 1.1;
   utter.rate = 1.02;
   const voices = window.speechSynthesis.getVoices();
   const femaleNames = ['petra', 'anna', 'helena', 'female', 'samantha', 'google deutsch', 'martina', 'katja'];
@@ -407,7 +595,13 @@ function speak(text, onEnd, force = false) {
   window.speechSynthesis.speak(utter);
 }
 
-// Manche Browser laden Stimmen asynchron nach
+function speakTeamReply(text) {
+  const segments = parseTeamReply(text);
+  if (segments.length === 0) { speak(text); return; }
+  const combined = segments.map(seg => seg.name ? `${seg.name} sagt: ${seg.text}` : seg.text).join('. ');
+  speak(combined);
+}
+
 if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = () => {};
 }
@@ -422,6 +616,17 @@ muteBtn.addEventListener('click', () => {
   localStorage.setItem('lina_muted', muted);
   updateMuteBtn();
   if (muted) window.speechSynthesis.cancel();
+});
+
+// ---- Tabs ----
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (callActive) endCall();
+    activeTab = btn.dataset.persona;
+    localStorage.setItem('lina_active_tab', activeTab);
+    applyPersonaChrome();
+    renderActiveTab();
+  });
 });
 
 // ---- Bild-Anhang ----
@@ -455,36 +660,43 @@ removeImageBtn.addEventListener('click', () => {
   imagePreview.style.display = 'none';
 });
 
-// ---- Nachricht an Lina schicken (gemeinsam für Text-Chat und Anruf) ----
+// ---- Nachricht an eine Persona schicken ----
 // userContent: was an die API geschickt wird (String oder Content-Block-Array)
 // displayContent: was als Chat-Bubble gerendert wird (String oder {text, imageDataUrl})
-async function askLina(userContent, displayContent) {
+async function askPersona(personaKey, userContent, displayContent) {
+  const hist = histories[personaKey];
   addBubble('user', displayContent !== undefined ? displayContent : userContent);
-  history.push({ role: 'user', content: userContent });
-  saveHistory();
+  hist.push({ role: 'user', content: userContent });
+  saveHistories();
 
-  const thinkingBubble = addBubble('lina thinking', 'Lina denkt nach …');
+  const thinkingBubble = addBubble('lina thinking', PERSONAS[personaKey].name + ' denkt nach …', true, personaKey);
   statusEl.textContent = 'tippt…';
 
   try {
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: history })
+      body: JSON.stringify({ messages: hist, persona: personaKey })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     thinkingBubble.remove();
     const reply = data.reply || '(keine Antwort erhalten)';
-    addBubble('lina', reply);
-    history.push({ role: 'assistant', content: reply });
-    saveHistory();
+
+    if (personaKey === 'team') {
+      renderTeamReply(reply);
+    } else {
+      addBubble('lina', reply, true, personaKey);
+    }
+
+    hist.push({ role: 'assistant', content: reply });
+    saveHistories();
     statusEl.textContent = 'bereit';
     statusEl.classList.remove('offline');
     return reply;
   } catch (err) {
     thinkingBubble.remove();
-    addBubble('lina', 'Hmm, ich konnte gerade nicht antworten. (' + err.message + ')');
+    addBubble('lina', 'Hmm, ich konnte gerade nicht antworten. (' + err.message + ')', true, personaKey);
     statusEl.textContent = 'Verbindungsfehler';
     statusEl.classList.add('offline');
     throw err;
@@ -512,18 +724,26 @@ form.addEventListener('submit', async (e) => {
   }
 
   try {
-    const reply = await askLina(userContent, displayContent);
-    speak(reply);
+    const reply = await askPersona(activeTab, userContent, displayContent);
+    if (activeTab === 'team') {
+      speakTeamReply(reply);
+    } else {
+      speak(reply);
+    }
   } catch (err) {
     // Fehler wurde bereits als Bubble angezeigt
   }
 });
 
-renderAll();
+applyPersonaChrome();
+renderActiveTab();
+updateMuteBtn();
 
 // ---- Anruf-Modus (Mikrofon + gesprochene Antworten) ----
 const callBtn = document.getElementById('call');
 const callOverlay = document.getElementById('callOverlay');
+const callAvatarEl = document.getElementById('callAvatar');
+const callNameEl = document.getElementById('callName');
 const callStatusEl = document.getElementById('callStatus');
 const callCaptionEl = document.getElementById('callCaption');
 const hangupBtn = document.getElementById('hangup');
@@ -535,8 +755,26 @@ let callActive = false;
 function setCallState(state) {
   callOverlay.classList.remove('listening', 'speaking', 'idle');
   callOverlay.classList.add(state);
-  const labels = { listening: 'Hört zu…', speaking: 'Lina spricht…', idle: 'Verbunden' };
+  const labels = { listening: 'Hört zu…', speaking: 'spricht…', idle: 'Verbunden' };
   callStatusEl.textContent = labels[state] || '';
+}
+
+function setupCallChrome() {
+  const p = PERSONAS[activeTab];
+  callNameEl.textContent = p.name;
+  callAvatarEl.innerHTML = '';
+  callAvatarEl.classList.remove('emoji');
+  if (p.avatarType === 'img') {
+    const img = document.createElement('img');
+    img.src = p.avatar;
+    img.alt = p.name;
+    img.style.width = '100%'; img.style.height = '100%';
+    img.style.objectFit = 'cover'; img.style.borderRadius = '50%';
+    callAvatarEl.appendChild(img);
+  } else {
+    callAvatarEl.classList.add('emoji');
+    callAvatarEl.textContent = p.avatar;
+  }
 }
 
 function startCall() {
@@ -549,6 +787,7 @@ function startCall() {
     return;
   }
   callActive = true;
+  setupCallChrome();
   callOverlay.classList.add('active');
   callCaptionEl.textContent = '';
   window.speechSynthesis.cancel();
@@ -614,17 +853,30 @@ function listenOnce() {
   try { recognition.start(); } catch (e) {}
 }
 
+function speakSegmentsSequentially(segments, idx) {
+  if (idx >= segments.length) { if (callActive) listenOnce(); return; }
+  const seg = segments[idx];
+  callCaptionEl.textContent = (seg.name ? seg.name + ': ' : '') + seg.text;
+  setCallState('speaking');
+  const spoken = seg.name ? `${seg.name} sagt: ${seg.text}` : seg.text;
+  speak(spoken, () => speakSegmentsSequentially(segments, idx + 1), true);
+}
+
 async function handleCallUtterance(text) {
   if (!text) { if (callActive) listenOnce(); return; }
   callCaptionEl.textContent = text;
   setCallState('idle');
-  callStatusEl.textContent = 'Lina denkt nach…';
+  callStatusEl.textContent = PERSONAS[activeTab].name + ' denkt nach…';
   try {
-    const reply = await askLina(text);
+    const reply = await askPersona(activeTab, text);
     if (!callActive) return;
-    callCaptionEl.textContent = reply;
-    setCallState('speaking');
-    speak(reply, () => { if (callActive) listenOnce(); }, true);
+    if (activeTab === 'team') {
+      speakSegmentsSequentially(parseTeamReply(reply), 0);
+    } else {
+      callCaptionEl.textContent = reply;
+      setCallState('speaking');
+      speak(reply, () => { if (callActive) listenOnce(); }, true);
+    }
   } catch (err) {
     if (callActive) listenOnce();
   }
