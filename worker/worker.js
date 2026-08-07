@@ -216,14 +216,21 @@ const REPORT_URLS = {
   support: 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/reports/support-chef.md',
 };
 
+// Auf ~800 Zeichen gekürzt, um das Groq-Tokenbudget (8000 TPM im Gratis-
+// Tarif) nicht bei jeder einzelnen Nachricht unnötig zu belasten.
+const MAX_REPORT_CHARS = 800;
+
 async function fetchDepartmentReport(persona) {
   const url = REPORT_URLS[persona];
   if (!url) return null;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const text = (await res.text()).trim();
+    let text = (await res.text()).trim();
     if (!text) return null;
+    if (text.length > MAX_REPORT_CHARS) {
+      text = text.slice(0, MAX_REPORT_CHARS) + '\n[…gekürzt, vollständiger Bericht liegt im Repo unter reports/]';
+    }
     return `Dein letzter eigener Arbeitsbericht (automatischer Lauf alle 2 Wochen, echte Analyse/Vorschläge, kein Live-Stand):\n${text}`;
   } catch {
     return null;
