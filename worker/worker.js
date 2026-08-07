@@ -253,25 +253,33 @@ export default {
       if (!env.RECLAIM_API_KEY) {
         return jsonResponse({ hasKey: false, note: 'RECLAIM_API_KEY ist nicht gesetzt' });
       }
-      try {
-        const now = Date.now();
-        const start = new Date(now - 6 * 3600 * 1000).toISOString();
-        const end = new Date(now + 30 * 3600 * 1000).toISOString();
-        const res = await fetch(
-          `https://api.app.reclaim.ai/api/events/personal?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
-          { headers: { Authorization: `Bearer ${env.RECLAIM_API_KEY}` } }
-        );
-        const bodyText = await res.text();
-        return jsonResponse({
-          hasKey: true,
-          keyLength: env.RECLAIM_API_KEY.length,
-          status: res.status,
-          ok: res.ok,
-          bodyPreview: bodyText.slice(0, 500),
-        });
-      } catch (err) {
-        return jsonResponse({ hasKey: true, error: err.message });
+      const now = Date.now();
+      const startDate = new Date(now - 6 * 3600 * 1000);
+      const endDate = new Date(now + 30 * 3600 * 1000);
+      const pad = (n) => String(n).padStart(2, '0');
+      const dateOnly = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+      const isoNoMs = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+      const formats = {
+        isoWithMs: [startDate.toISOString(), endDate.toISOString()],
+        isoNoMs: [isoNoMs(startDate), isoNoMs(endDate)],
+        dateOnly: [dateOnly(startDate), dateOnly(endDate)],
+        unixSeconds: [String(Math.floor(startDate.getTime() / 1000)), String(Math.floor(endDate.getTime() / 1000))],
+        unixMillis: [String(startDate.getTime()), String(endDate.getTime())],
+      };
+      const results = {};
+      for (const [name, [s, e]] of Object.entries(formats)) {
+        try {
+          const res = await fetch(
+            `https://api.app.reclaim.ai/api/events/personal?start=${encodeURIComponent(s)}&end=${encodeURIComponent(e)}`,
+            { headers: { Authorization: `Bearer ${env.RECLAIM_API_KEY}` } }
+          );
+          const bodyText = await res.text();
+          results[name] = { sent: { start: s, end: e }, status: res.status, ok: res.ok, bodyPreview: bodyText.slice(0, 300) };
+        } catch (err) {
+          results[name] = { sent: { start: s, end: e }, error: err.message };
+        }
       }
+      return jsonResponse({ hasKey: true, keyLength: env.RECLAIM_API_KEY.length, results });
     }
 
     // Sprachausgabe (Groq TTS, Englisch) - separater Zweig, gleicher
