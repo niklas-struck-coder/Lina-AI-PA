@@ -631,6 +631,9 @@ const headerTitleEl = document.getElementById('headerTitle');
 
 let histories = loadHistories();
 let muted = localStorage.getItem('lina_muted') === 'true';
+// 'en' = Groq-Stimme (klingt natürlich, spricht Deutsch mit englischem Akzent)
+// 'de' = Browser-eigene deutsche Stimme (korrekte Aussprache, klingt robotischer)
+let voiceLang = localStorage.getItem('lina_voice_lang') === 'de' ? 'de' : 'en';
 let pendingImage = null; // { mediaType, base64, dataUrl }
 
 if (WORKER_URL.includes('PASTE_YOUR_WORKER_URL_HERE')) {
@@ -885,6 +888,8 @@ async function speak(text, onEnd, force = false, personaKey = 'lina') {
   if (muted && !force) { if (onEnd) onEnd(); return; }
   stopSpeaking();
 
+  if (voiceLang === 'de') { speakFallback(text, onEnd, personaKey); return; }
+
   try {
     const res = await fetch(WORKER_URL, {
       method: 'POST',
@@ -1088,8 +1093,55 @@ function renderSettings() {
     settingsList.appendChild(row);
   });
 
+  renderVoiceLangSetting();
   renderVoiceDiagnostics();
   renderDangerZone();
+}
+
+function renderVoiceLangSetting() {
+  const box = document.createElement('div');
+  box.className = 'settings-voices';
+
+  const title = document.createElement('div');
+  title.className = 'settings-voices-title';
+  title.textContent = 'Sprachausgabe (Stimme im Chat/Anruf)';
+  box.appendChild(title);
+
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.gap = '8px';
+  row.style.marginTop = '8px';
+
+  const makeBtn = (lang, label) => {
+    const b = document.createElement('button');
+    b.className = 'settings-reset';
+    b.style.flex = '1';
+    b.style.width = 'auto';
+    b.textContent = label;
+    b.style.opacity = voiceLang === lang ? '1' : '0.5';
+    b.style.fontWeight = voiceLang === lang ? '700' : '400';
+    b.addEventListener('click', () => {
+      voiceLang = lang;
+      localStorage.setItem('lina_voice_lang', lang);
+      stopSpeaking();
+      renderSettings();
+    });
+    return b;
+  };
+
+  row.appendChild(makeBtn('en', 'Englisch (natürlicher)'));
+  row.appendChild(makeBtn('de', 'Deutsch (Browser)'));
+  box.appendChild(row);
+
+  const note = document.createElement('div');
+  note.className = 'settings-voices-list';
+  note.style.marginTop = '6px';
+  note.textContent = voiceLang === 'en'
+    ? 'Klingt natürlicher, liest deutschen Text aber mit englischer Aussprache.'
+    : 'Spricht korrektes Deutsch, klingt aber robotischer (Browser-eigene Stimme).';
+  box.appendChild(note);
+
+  settingsList.appendChild(box);
 }
 
 function renderDangerZone() {
