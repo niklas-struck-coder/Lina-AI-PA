@@ -246,9 +246,9 @@ export default {
       return jsonResponse({ error: 'Invalid JSON' }, 400);
     }
 
-    // Sprachausgabe (inoffizielle Microsoft-Edge-Stimmen) - separater Zweig,
-    // gleicher Endpunkt. Bei jedem Fehler springt das Frontend automatisch
-    // auf die Browser-eigene Stimme zurück (speakFallback in index.html).
+    // Sprachausgabe (Groq TTS, Englisch) - separater Zweig, gleicher
+    // Endpunkt. Bei jedem Fehler springt das Frontend automatisch auf die
+    // Browser-eigene Stimme zurück (speakFallback in index.html).
     if (body.action === 'speak') {
       const voicePersona = GROQ_VOICE_NAMES[body.persona] ? body.persona : 'lina';
       const voiceName = GROQ_VOICE_NAMES[voicePersona];
