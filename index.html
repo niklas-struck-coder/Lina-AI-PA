@@ -910,14 +910,16 @@ async function speak(text, onEnd, force = false, personaKey = 'lina') {
   }
 }
 
-// Browser-eigene Sprachausgabe als Rückfallebene (falls ElevenLabs mal
-// nicht erreichbar ist oder das kostenlose Kontingent aufgebraucht ist).
+// Browser-eigene Sprachausgabe als Rückfallebene (falls die Groq-Stimme mal
+// nicht erreichbar ist). Nutzt bewusst für ALLE Personas dieselbe Stimme
+// wie Lina (Ni möchte eine einheitliche Stimme statt pro Person eine
+// eigene, auch im Rückfall-Modus).
 function speakFallback(text, onEnd, personaKey) {
   if (!('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'de-DE';
-  const vc = (PERSONAS[personaKey] && PERSONAS[personaKey].voice) || PERSONAS.lina.voice;
+  const vc = PERSONAS.lina.voice;
   utter.pitch = vc.pitch;
   utter.rate = vc.rate;
   const voices = window.speechSynthesis.getVoices();

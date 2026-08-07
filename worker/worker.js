@@ -70,17 +70,13 @@ const CORS_HEADERS = {
 const GROQ_MODEL = 'qwen/qwen3.6-27b'; // multimodal - kann Text und Bilder
 const PROJECT_STATUS_URL = 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/status.md';
 
-// Feste Groq-TTS-Stimmen pro Person (Orpheus, offizielle Groq-API - kostenlos,
-// zuverlässig, aber nur Englisch. Der Chat-Text bleibt Deutsch; die Stimme
-// liest ihn mit englischer Aussprache vor (bewusste Entscheidung von Ni,
-// da es keine zuverlässige kostenlose deutsche Cloud-Stimme gibt).
+// Groq-TTS-Stimme (Orpheus, offizielle Groq-API - kostenlos, zuverlässig,
+// aber nur Englisch. Der Chat-Text bleibt Deutsch; die Stimme liest ihn mit
+// englischer Aussprache vor). Alle Personas nutzen bewusst dieselbe Stimme
+// wie Lina (Ni möchte eine einheitliche Stimme statt pro Person eine
+// eigene).
 const GROQ_TTS_MODEL = 'canopylabs/orpheus-v1-english';
-const GROQ_VOICE_NAMES = {
-  lina: 'hannah',
-  it: 'daniel',
-  marketing: 'troy',
-  support: 'diana',
-};
+const GROQ_VOICE_NAME = 'hannah';
 
 async function fetchGroqTTSAudio(text, voiceName, env) {
   const res = await fetch('https://api.groq.com/openai/v1/audio/speech', {
@@ -299,10 +295,8 @@ export default {
     // Endpunkt. Bei jedem Fehler springt das Frontend automatisch auf die
     // Browser-eigene Stimme zurück (speakFallback in index.html).
     if (body.action === 'speak') {
-      const voicePersona = GROQ_VOICE_NAMES[body.persona] ? body.persona : 'lina';
-      const voiceName = GROQ_VOICE_NAMES[voicePersona];
       try {
-        const audioBuffer = await fetchGroqTTSAudio(body.text, voiceName, env);
+        const audioBuffer = await fetchGroqTTSAudio(body.text, GROQ_VOICE_NAME, env);
         if (!audioBuffer || audioBuffer.byteLength === 0) {
           return jsonResponse({ error: 'Groq TTS: kein Audio erhalten' }, 502);
         }
