@@ -177,6 +177,29 @@ async function fetchProjectStatusContext() {
   }
 }
 
+// Berichte der Abteilungs-Agents (Cloud-Routinen, laufen alle 2 Wochen,
+// analysieren travix.ai wirklich und schreiben Vorschläge - kein Live-
+// Zugriff, aber echte, aktuelle Arbeit statt nur Chat-Antworten).
+const REPORT_URLS = {
+  it: 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/reports/it-chef.md',
+  marketing: 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/reports/marketing-chef.md',
+  support: 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/reports/support-chef.md',
+};
+
+async function fetchDepartmentReport(persona) {
+  const url = REPORT_URLS[persona];
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const text = (await res.text()).trim();
+    if (!text) return null;
+    return `Dein letzter eigener Arbeitsbericht (automatischer Lauf alle 2 Wochen, echte Analyse/Vorschläge, kein Live-Stand):\n${text}`;
+  } catch {
+    return null;
+  }
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -227,13 +250,15 @@ export default {
       }
     }
 
-    const [calendarContext, projectContext] = await Promise.all([
+    const persona = SYSTEM_PROMPTS[body.persona] ? body.persona : 'lina';
+
+    const [calendarContext, projectContext, departmentReport] = await Promise.all([
       fetchCalendarContext(env),
       fetchProjectStatusContext(),
+      fetchDepartmentReport(persona),
     ]);
 
-    const persona = SYSTEM_PROMPTS[body.persona] ? body.persona : 'lina';
-    const systemText = [SYSTEM_PROMPTS[persona], CONTEXT_NOTE, calendarContext, projectContext]
+    const systemText = [SYSTEM_PROMPTS[persona], CONTEXT_NOTE, calendarContext, projectContext, departmentReport]
       .filter(Boolean)
       .join('\n\n');
 
