@@ -1,0 +1,7 @@
+name = "lina-proxy"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+# Der API-Key wird NICHT hier eingetragen, sondern per
+# "wrangler secret put ANTHROPIC_API_KEY" oder im Cloudflare-Dashboard
+# unter Settings > Variables als verschlüsseltes Secret gesetzt.
