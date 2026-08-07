@@ -246,6 +246,34 @@ export default {
       return jsonResponse({ error: 'Invalid JSON' }, 400);
     }
 
+    // Temporäre Diagnose für den Reclaim-Kalender-Zugriff - zeigt den
+    // rohen Fehler, ohne den Key selbst preiszugeben. Kann später wieder
+    // entfernt werden.
+    if (body.action === 'debug-calendar') {
+      if (!env.RECLAIM_API_KEY) {
+        return jsonResponse({ hasKey: false, note: 'RECLAIM_API_KEY ist nicht gesetzt' });
+      }
+      try {
+        const now = Date.now();
+        const start = new Date(now - 6 * 3600 * 1000).toISOString();
+        const end = new Date(now + 30 * 3600 * 1000).toISOString();
+        const res = await fetch(
+          `https://api.app.reclaim.ai/api/events/personal?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+          { headers: { Authorization: `Bearer ${env.RECLAIM_API_KEY}` } }
+        );
+        const bodyText = await res.text();
+        return jsonResponse({
+          hasKey: true,
+          keyLength: env.RECLAIM_API_KEY.length,
+          status: res.status,
+          ok: res.ok,
+          bodyPreview: bodyText.slice(0, 500),
+        });
+      } catch (err) {
+        return jsonResponse({ hasKey: true, error: err.message });
+      }
+    }
+
     // Sprachausgabe (Groq TTS, Englisch) - separater Zweig, gleicher
     // Endpunkt. Bei jedem Fehler springt das Frontend automatisch auf die
     // Browser-eigene Stimme zurück (speakFallback in index.html).
