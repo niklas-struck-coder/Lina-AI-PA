@@ -202,7 +202,7 @@ export default {
         body: JSON.stringify({
           model: GROQ_MODEL,
           messages,
-          max_tokens: 1024,
+          max_tokens: 2048, // qwen3.6 verbraucht Tokens fürs "Denken" vor der eigentlichen Antwort
         }),
       });
 
@@ -212,7 +212,10 @@ export default {
         return jsonResponse({ error: data.error?.message || 'Groq API error' }, groqRes.status);
       }
 
-      const reply = data.choices?.[0]?.message?.content?.trim() || '(keine Antwort)';
+      let reply = data.choices?.[0]?.message?.content || '';
+      // qwen3.6 ist ein "Denk"-Modell und packt seinen Gedankengang in <think>-Tags
+      // vor die eigentliche Antwort - das soll der Nutzer nie sehen.
+      reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim() || '(keine Antwort)';
 
       return jsonResponse({ reply });
     } catch (err) {
