@@ -533,31 +533,39 @@ const WORKER_URL = "https://wispy-term-8f4f.niklas-struck.workers.dev";
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 // ---- Team ----
+// voice: bevorzugte Stimmnamen (je nachdem was Browser/Gerät anbietet) +
+// Tonhöhe/Tempo als verlässlicher Unterschied, falls nur 1-2 Stimmen
+// verfügbar sind (Web Speech API kann pro Gerät stark variieren).
 const PERSONAS = {
   lina: {
     name: 'Lina', tabLabel: '💬 Lina', role: 'Persönliche Assistentin',
     avatarType: 'img', avatar: 'icon-192.png', color: '#00A98F',
     greeting: 'Hey, ich bin Lina 👋 Frag mich einfach etwas, schick mir ein Bild, oder ruf mich an.',
+    voice: { names: ['petra', 'anna', 'helena', 'female', 'samantha', 'google deutsch', 'martina', 'katja'], pitch: 1.15, rate: 1.02 },
   },
   it: {
     name: 'IT-Chef', tabLabel: '🖥️ IT-Chef', role: 'Technik & Entwicklung',
     avatarType: 'emoji', avatar: '🖥️', color: '#3E6FB0',
     greeting: 'IT-Chef hier 🖥️ Frag mich zu Code, Architektur oder travix.ai-Technik.',
+    voice: { names: ['markus', 'yannick', 'stefan', 'conrad', 'daniel', 'male', 'google deutsch'], pitch: 0.82, rate: 0.98 },
   },
   marketing: {
     name: 'Marketing-Chef', tabLabel: '📈 Marketing', role: 'Marketing & Strategie',
     avatarType: 'emoji', avatar: '📈', color: '#D98A2B',
     greeting: 'Marketing-Chef hier 📈 Lass uns über Positionierung, Zielgruppen oder Kampagnen sprechen.',
+    voice: { names: ['yannick', 'markus', 'stefan', 'conrad', 'daniel', 'male'], pitch: 1.05, rate: 1.15 },
   },
   support: {
     name: 'Support-Chef', tabLabel: '🎧 Support', role: 'Kundenservice & Support',
     avatarType: 'emoji', avatar: '🎧', color: '#8E5FC7',
     greeting: 'Support-Chef hier 🎧 Frag mich zu Kundenerfahrung, Support-Prozessen oder Nutzerproblemen.',
+    voice: { names: ['anna', 'helena', 'petra', 'female', 'martina', 'katja'], pitch: 0.92, rate: 0.94 },
   },
   team: {
     name: 'Team-Meeting', tabLabel: '👥 Team-Meeting', role: 'Alle zusammen',
     avatarType: 'emoji', avatar: '👥', color: '#4A4640',
     greeting: 'Willkommen im Team-Meeting 👥 Frag etwas — die passenden Personen antworten.',
+    voice: { names: ['google deutsch'], pitch: 1.0, rate: 1.0 },
   },
 };
 const PERSONA_ORDER = ['lina', 'it', 'marketing', 'support', 'team'];
@@ -821,30 +829,41 @@ function addBubble(who, content, scroll = true, personaKey = 'lina', label = nul
   return row;
 }
 
-// speak(text, onEnd, force) - force=true spricht auch wenn stummgeschaltet (Anruf-Modus)
-function speak(text, onEnd, force = false) {
+// speak(text, onEnd, force, personaKey) - force=true spricht auch wenn
+// stummgeschaltet (Anruf-Modus). Jede Persona hat eigene Stimm-Vorlieben
+// (Name + Tonhöhe/Tempo), damit sie unterscheidbar klingen.
+function speak(text, onEnd, force = false, personaKey = 'lina') {
   if (muted && !force) { if (onEnd) onEnd(); return; }
   if (!('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'de-DE';
-  utter.pitch = 1.1;
-  utter.rate = 1.02;
+  const vc = (PERSONAS[personaKey] && PERSONAS[personaKey].voice) || PERSONAS.lina.voice;
+  utter.pitch = vc.pitch;
+  utter.rate = vc.rate;
   const voices = window.speechSynthesis.getVoices();
-  const femaleNames = ['petra', 'anna', 'helena', 'female', 'samantha', 'google deutsch', 'martina', 'katja'];
   let voice = voices.find(v => v.lang.toLowerCase().startsWith('de') &&
-    femaleNames.some(n => v.name.toLowerCase().includes(n)));
+    vc.names.some(n => v.name.toLowerCase().includes(n)));
   if (!voice) voice = voices.find(v => v.lang.toLowerCase().startsWith('de'));
   if (voice) utter.voice = voice;
   if (onEnd) utter.onend = onEnd;
   window.speechSynthesis.speak(utter);
 }
 
+// Spricht eine Team-Antwort segmentweise, jede Person mit ihrer eigenen
+// Stimme. uiCallback (optional) wird vor jedem Segment aufgerufen, für
+// Anruf-Untertitel o.ä.
+function speakSegmentsQueue(segments, idx, onAllDone, uiCallback, force = false) {
+  if (idx >= segments.length) { if (onAllDone) onAllDone(); return; }
+  const seg = segments[idx];
+  const key = seg.name ? (NAME_TO_KEY[seg.name] || 'team') : 'team';
+  if (uiCallback) uiCallback(seg, key);
+  const spoken = seg.name ? `${getPersona(key).name} sagt: ${seg.text}` : seg.text;
+  speak(spoken, () => speakSegmentsQueue(segments, idx + 1, onAllDone, uiCallback, force), force, key);
+}
+
 function speakTeamReply(text) {
-  const segments = parseTeamReply(text);
-  if (segments.length === 0) { speak(text); return; }
-  const combined = segments.map(seg => seg.name ? `${seg.name} sagt: ${seg.text}` : seg.text).join('. ');
-  speak(combined);
+  speakSegmentsQueue(parseTeamReply(text), 0);
 }
 
 if ('speechSynthesis' in window) {
@@ -1118,7 +1137,7 @@ form.addEventListener('submit', async (e) => {
     if (activeTab === 'team') {
       speakTeamReply(reply);
     } else {
-      speak(reply);
+      speak(reply, undefined, false, activeTab);
     }
   } catch (err) {
     // Fehler wurde bereits als Bubble angezeigt
@@ -1243,15 +1262,6 @@ function listenOnce() {
   try { recognition.start(); } catch (e) {}
 }
 
-function speakSegmentsSequentially(segments, idx) {
-  if (idx >= segments.length) { if (callActive) listenOnce(); return; }
-  const seg = segments[idx];
-  callCaptionEl.textContent = (seg.name ? seg.name + ': ' : '') + seg.text;
-  setCallState('speaking');
-  const spoken = seg.name ? `${seg.name} sagt: ${seg.text}` : seg.text;
-  speak(spoken, () => speakSegmentsSequentially(segments, idx + 1), true);
-}
-
 async function handleCallUtterance(text) {
   if (!text) { if (callActive) listenOnce(); return; }
   callCaptionEl.textContent = text;
@@ -1261,11 +1271,19 @@ async function handleCallUtterance(text) {
     const reply = await askPersona(activeTab, text);
     if (!callActive) return;
     if (activeTab === 'team') {
-      speakSegmentsSequentially(parseTeamReply(reply), 0);
+      speakSegmentsQueue(
+        parseTeamReply(reply), 0,
+        () => { if (callActive) listenOnce(); },
+        (seg, key) => {
+          callCaptionEl.textContent = (seg.name ? getPersona(key).name + ': ' : '') + seg.text;
+          setCallState('speaking');
+        },
+        true
+      );
     } else {
       callCaptionEl.textContent = reply;
       setCallState('speaking');
-      speak(reply, () => { if (callActive) listenOnce(); }, true);
+      speak(reply, () => { if (callActive) listenOnce(); }, true, activeTab);
     }
   } catch (err) {
     if (callActive) listenOnce();
