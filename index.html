@@ -61,35 +61,148 @@
   header .status.offline { color: var(--danger); }
   header .actions { display: flex; gap: 8px; flex-shrink: 0; }
 
-  #tabs {
+  button#menuToggle {
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 8px;
+    flex-shrink: 0;
+  }
+
+  /* ---- Menü-Schublade (WhatsApp-Style) ---- */
+  #menuOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20,18,15,0.35);
+    z-index: 60;
+    display: none;
+  }
+  #menuOverlay.active { display: block; }
+  #drawer {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 280px;
+    max-width: 82vw;
+    background: var(--white);
+    z-index: 70;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
     display: flex;
-    gap: 6px;
-    padding: 10px 16px;
-    overflow-x: auto;
+    flex-direction: column;
+    box-shadow: 2px 0 20px rgba(20,18,15,0.15);
+  }
+  #drawer.active { transform: translateX(0); }
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 16px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+  }
+  .drawer-title { font-weight: 700; font-size: 17px; }
+  .drawer-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .drawer-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+  .drawer-item:hover, .drawer-item.active { background: var(--cream-panel); }
+  .drawer-item .avatar-badge { width: 44px; height: 44px; font-size: 22px; }
+  .drawer-item-text { flex: 1; min-width: 0; }
+  .drawer-item-name { font-weight: 600; font-size: 15px; }
+  .drawer-item-role { font-size: 12px; color: var(--muted); }
+  .drawer-settings-btn {
+    margin: 8px 16px 16px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: var(--cream-panel);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* ---- Einstellungen ---- */
+  #settingsScreen {
+    position: fixed;
+    inset: 0;
+    background: var(--cream);
+    z-index: 90;
+    display: none;
+    flex-direction: column;
+  }
+  #settingsScreen.active { display: flex; }
+  .settings-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
     background: var(--white);
     border-bottom: 1px solid rgba(0,0,0,0.06);
     flex-shrink: 0;
   }
-  #tabs::-webkit-scrollbar { display: none; }
-  .tab {
-    flex-shrink: 0;
+  .settings-header button {
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-size: 15px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .settings-header h1 { font-size: 17px; margin: 0; }
+  .settings-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .settings-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: 1px solid rgba(0,0,0,0.08);
-    background: var(--cream-panel);
-    color: var(--ink);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
+    gap: 12px;
+    background: var(--white);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 12px;
   }
-  .tab.active {
-    background: var(--tab-color, var(--teal));
-    color: #ffffff;
-    border-color: transparent;
+  .settings-avatar {
+    width: 52px; height: 52px; font-size: 26px;
+    cursor: pointer; flex-shrink: 0; position: relative;
+  }
+  .settings-avatar::after {
+    content: '\270E';
+    position: absolute; bottom: -2px; right: -2px;
+    background: var(--teal); color: #fff;
+    width: 18px; height: 18px; border-radius: 50%;
+    font-size: 10px; display: flex; align-items: center; justify-content: center;
+  }
+  .settings-name-input {
+    flex: 1; min-width: 0;
+    background: var(--cream-panel);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--ink);
+    outline: none;
+  }
+  .settings-reset {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 17px;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 6px;
   }
 
   #messages {
@@ -345,8 +458,27 @@
     <div id="loginError"></div>
   </div>
 </div>
+<div id="menuOverlay"></div>
+<nav id="drawer">
+  <div class="drawer-header">
+    <div class="avatar-badge"><img src="icon-192.png" alt="Lina"></div>
+    <div class="drawer-title">Lina &amp; Team</div>
+  </div>
+  <div class="drawer-list" id="drawerList"></div>
+  <button id="openSettings" class="drawer-settings-btn">⚙️ Einstellungen</button>
+</nav>
+
+<div id="settingsScreen">
+  <div class="settings-header">
+    <button id="closeSettings">← Zurück</button>
+    <h1>Einstellungen</h1>
+  </div>
+  <div class="settings-list" id="settingsList"></div>
+</div>
+
 <div id="app">
   <header>
+    <button id="menuToggle" title="Menü">☰</button>
     <div id="headerAvatar" class="avatar-badge"></div>
     <div>
       <div class="title" id="headerTitle">Lina</div>
@@ -358,14 +490,6 @@
       <button id="mute" title="Stimme an/aus">🔊</button>
     </div>
   </header>
-
-  <nav id="tabs">
-    <button class="tab" data-persona="lina">💬 Lina</button>
-    <button class="tab" data-persona="it">🖥️ IT-Chef</button>
-    <button class="tab" data-persona="marketing">📈 Marketing</button>
-    <button class="tab" data-persona="support">🎧 Support</button>
-    <button class="tab" data-persona="team">👥 Team-Meeting</button>
-  </nav>
 
   <div id="messages"></div>
 
@@ -437,12 +561,34 @@ const PERSONAS = {
   },
 };
 const PERSONA_ORDER = ['lina', 'it', 'marketing', 'support', 'team'];
+// NAME_TO_KEY bleibt an die festen Basis-Namen gebunden (nicht umbenannt) -
+// die API/das Modell kennt nur diese Namen im "Name: Text"-Team-Format.
 const NAME_TO_KEY = Object.fromEntries(
   PERSONA_ORDER.filter(k => k !== 'team').map(k => [PERSONAS[k].name, k])
 );
 
 let activeTab = localStorage.getItem('lina_active_tab') || 'lina';
 if (!PERSONAS[activeTab]) activeTab = 'lina';
+
+// ---- Persona-Anpassungen (Name/Profilbild, pro Person überschreibbar) ----
+let personaOverrides = {};
+try { personaOverrides = JSON.parse(localStorage.getItem('lina_persona_overrides') || '{}'); } catch (e) {}
+
+function savePersonaOverrides() {
+  localStorage.setItem('lina_persona_overrides', JSON.stringify(personaOverrides));
+}
+
+function getPersona(key) {
+  const base = PERSONAS[key];
+  const ov = personaOverrides[key];
+  if (!ov) return base;
+  return {
+    ...base,
+    name: ov.name && ov.name.trim() ? ov.name.trim() : base.name,
+    avatarType: ov.avatarDataUrl ? 'img' : base.avatarType,
+    avatar: ov.avatarDataUrl || base.avatar,
+  };
+}
 
 const messagesEl = document.getElementById('messages');
 const form = document.getElementById('composer');
@@ -548,14 +694,12 @@ function setAvatarBadge(el, persona) {
 }
 
 function applyPersonaChrome() {
-  const p = PERSONAS[activeTab];
+  const p = getPersona(activeTab);
   document.documentElement.style.setProperty('--persona', p.color);
   headerTitleEl.textContent = p.name;
   setAvatarBadge(headerAvatarEl, p);
-  document.querySelectorAll('.tab').forEach(btn => {
-    const isActive = btn.dataset.persona === activeTab;
-    btn.classList.toggle('active', isActive);
-    btn.style.setProperty('--tab-color', PERSONAS[btn.dataset.persona].color);
+  document.querySelectorAll('.drawer-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.persona === activeTab);
   });
   input.placeholder = activeTab === 'team' ? 'Frag das ganze Team…' : `Schreib ${p.name} etwas…`;
 }
@@ -597,12 +741,12 @@ function parseTeamReply(text) {
 function renderTeamReply(text, scroll = true) {
   const segments = parseTeamReply(text);
   if (segments.length === 0) {
-    addBubble('lina', text, scroll, 'team', PERSONAS.team.name);
+    addBubble('lina', text, scroll, 'team', getPersona('team').name);
     return;
   }
   segments.forEach(seg => {
     const key = seg.name ? (NAME_TO_KEY[seg.name] || 'team') : 'team';
-    addBubble('lina', seg.text, scroll, key, seg.name || PERSONAS.team.name);
+    addBubble('lina', seg.text, scroll, key, getPersona(key).name);
   });
 }
 
@@ -633,7 +777,7 @@ function addBubble(who, content, scroll = true, personaKey = 'lina', label = nul
   row.className = 'msg-row ' + who;
 
   if (classes[0] === 'lina') {
-    const p = PERSONAS[personaKey] || PERSONAS.lina;
+    const p = getPersona(personaKey) || getPersona('lina');
     const avatar = document.createElement('div');
     avatar.className = 'msg-avatar-badge';
     setAvatarBadge(avatar, p);
@@ -643,7 +787,7 @@ function addBubble(who, content, scroll = true, personaKey = 'lina', label = nul
   const bubble = document.createElement('div');
   bubble.className = 'msg ' + who;
   if (classes[0] === 'lina') {
-    bubble.style.setProperty('--badge-color', (PERSONAS[personaKey] || PERSONAS.lina).color);
+    bubble.style.setProperty('--badge-color', (getPersona(personaKey) || getPersona('lina')).color);
   }
 
   if (label) {
@@ -719,16 +863,150 @@ muteBtn.addEventListener('click', () => {
   if (muted) window.speechSynthesis.cancel();
 });
 
-// ---- Tabs ----
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (callActive) endCall();
-    activeTab = btn.dataset.persona;
-    localStorage.setItem('lina_active_tab', activeTab);
-    applyPersonaChrome();
-    renderActiveTab();
+// ---- Menü-Schublade ----
+const menuToggle = document.getElementById('menuToggle');
+const menuOverlay = document.getElementById('menuOverlay');
+const drawer = document.getElementById('drawer');
+const drawerList = document.getElementById('drawerList');
+
+function renderDrawer() {
+  drawerList.innerHTML = '';
+  PERSONA_ORDER.forEach(key => {
+    const p = getPersona(key);
+    const item = document.createElement('div');
+    item.className = 'drawer-item' + (key === activeTab ? ' active' : '');
+    item.dataset.persona = key;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar-badge';
+    setAvatarBadge(avatar, p);
+    item.appendChild(avatar);
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'drawer-item-text';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'drawer-item-name';
+    nameEl.textContent = p.name;
+    const roleEl = document.createElement('div');
+    roleEl.className = 'drawer-item-role';
+    roleEl.textContent = PERSONAS[key].role;
+    textWrap.appendChild(nameEl);
+    textWrap.appendChild(roleEl);
+    item.appendChild(textWrap);
+
+    item.addEventListener('click', () => {
+      if (callActive) endCall();
+      activeTab = key;
+      localStorage.setItem('lina_active_tab', activeTab);
+      applyPersonaChrome();
+      renderActiveTab();
+      closeDrawer();
+    });
+
+    drawerList.appendChild(item);
   });
+}
+
+function openDrawer() {
+  renderDrawer();
+  drawer.classList.add('active');
+  menuOverlay.classList.add('active');
+}
+
+function closeDrawer() {
+  drawer.classList.remove('active');
+  menuOverlay.classList.remove('active');
+}
+
+menuToggle.addEventListener('click', () => {
+  if (drawer.classList.contains('active')) closeDrawer(); else openDrawer();
 });
+menuOverlay.addEventListener('click', closeDrawer);
+
+// ---- Einstellungen (Profilbild/Name pro Person) ----
+const settingsScreen = document.getElementById('settingsScreen');
+const settingsList = document.getElementById('settingsList');
+const openSettingsBtn = document.getElementById('openSettings');
+const closeSettingsBtn = document.getElementById('closeSettings');
+
+function renderSettings() {
+  settingsList.innerHTML = '';
+  PERSONA_ORDER.forEach(key => {
+    const p = getPersona(key);
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar-badge settings-avatar';
+    setAvatarBadge(avatar, p);
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.hidden = true;
+
+    avatar.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { alert('Bitte eine Bilddatei auswählen.'); return; }
+      if (file.size > MAX_IMAGE_BYTES) { alert('Das Bild ist zu groß (max. 4 MB).'); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        personaOverrides[key] = personaOverrides[key] || {};
+        personaOverrides[key].avatarDataUrl = reader.result;
+        savePersonaOverrides();
+        setAvatarBadge(avatar, getPersona(key));
+        if (key === activeTab) applyPersonaChrome();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'settings-name-input';
+    nameInput.value = p.name;
+    nameInput.placeholder = PERSONAS[key].name;
+    nameInput.addEventListener('input', () => {
+      personaOverrides[key] = personaOverrides[key] || {};
+      personaOverrides[key].name = nameInput.value;
+      savePersonaOverrides();
+      if (key === activeTab) applyPersonaChrome();
+    });
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'settings-reset';
+    resetBtn.textContent = '↺';
+    resetBtn.title = 'Zurücksetzen';
+    resetBtn.addEventListener('click', () => {
+      delete personaOverrides[key];
+      savePersonaOverrides();
+      nameInput.value = PERSONAS[key].name;
+      setAvatarBadge(avatar, PERSONAS[key]);
+      if (key === activeTab) applyPersonaChrome();
+    });
+
+    row.appendChild(avatar);
+    row.appendChild(fileInput);
+    row.appendChild(nameInput);
+    row.appendChild(resetBtn);
+    settingsList.appendChild(row);
+  });
+}
+
+function openSettings() {
+  closeDrawer();
+  renderSettings();
+  settingsScreen.classList.add('active');
+}
+
+function closeSettings() {
+  settingsScreen.classList.remove('active');
+  renderDrawer();
+}
+
+openSettingsBtn.addEventListener('click', openSettings);
+closeSettingsBtn.addEventListener('click', closeSettings);
 
 // ---- Bild-Anhang ----
 attachBtn.addEventListener('click', () => imageInput.click());
@@ -770,7 +1048,7 @@ async function askPersona(personaKey, userContent, displayContent) {
   hist.push({ role: 'user', content: userContent });
   saveHistories();
 
-  const thinkingBubble = addBubble('lina thinking', PERSONAS[personaKey].name + ' denkt nach …', true, personaKey);
+  const thinkingBubble = addBubble('lina thinking', getPersona(personaKey).name + ' denkt nach …', true, personaKey);
   statusEl.textContent = 'tippt…';
 
   try {
@@ -872,7 +1150,7 @@ function setCallState(state) {
 }
 
 function setupCallChrome() {
-  const p = PERSONAS[activeTab];
+  const p = getPersona(activeTab);
   callNameEl.textContent = p.name;
   callAvatarEl.innerHTML = '';
   callAvatarEl.classList.remove('emoji');
@@ -978,7 +1256,7 @@ async function handleCallUtterance(text) {
   if (!text) { if (callActive) listenOnce(); return; }
   callCaptionEl.textContent = text;
   setCallState('idle');
-  callStatusEl.textContent = PERSONAS[activeTab].name + ' denkt nach…';
+  callStatusEl.textContent = getPersona(activeTab).name + ' denkt nach…';
   try {
     const reply = await askPersona(activeTab, text);
     if (!callActive) return;
