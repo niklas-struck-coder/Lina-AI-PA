@@ -63,7 +63,7 @@ Reclaim-App bzw. die Claude/Cowork-App nutzen soll.`;
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Access-Code',
 };
 
 const GEMINI_MODEL = 'gemini-2.0-flash';
@@ -160,6 +160,11 @@ export default {
 
     if (request.method !== 'POST') {
       return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS });
+    }
+
+    // Zugangscode-Sperre: nur aktiv, wenn ACCESS_CODE als Secret gesetzt ist.
+    if (env.ACCESS_CODE && request.headers.get('X-Access-Code') !== env.ACCESS_CODE) {
+      return jsonResponse({ error: 'Falscher oder fehlender Zugangscode' }, 401);
     }
 
     let body;

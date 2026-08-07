@@ -275,9 +275,76 @@
     background: var(--danger); color: white; border: none; font-size: 26px;
     cursor: pointer; box-shadow: 0 4px 16px rgba(228,87,61,0.35);
   }
+
+  /* ---- Login/Zugangscode ---- */
+  #loginScreen {
+    position: fixed;
+    inset: 0;
+    background: var(--cream);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+  }
+  #loginScreen.active { display: flex; }
+  .login-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 32px 28px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(43,42,40,0.1);
+  }
+  .login-card .avatar-badge {
+    width: 64px; height: 64px; font-size: 32px;
+    margin: 0 auto 16px;
+  }
+  .login-card h1 { font-size: 20px; margin: 0 0 8px; }
+  .login-card p { font-size: 14px; color: var(--muted); margin: 0 0 20px; line-height: 1.4; }
+  #loginForm { display: flex; flex-direction: column; gap: 12px; }
+  #accessCodeInput {
+    background: var(--cream-panel);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 16px;
+    text-align: center;
+    color: var(--ink);
+    outline: none;
+  }
+  #loginForm button {
+    background: var(--teal);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #loginError {
+    display: none;
+    color: var(--danger);
+    font-size: 13px;
+    margin-top: 12px;
+  }
 </style>
 </head>
 <body>
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="avatar-badge"><img src="icon-192.png" alt="Lina"></div>
+    <h1>Zugangscode</h1>
+    <p>Bitte gib den Zugangscode ein, um mit Lina &amp; Team zu chatten.</p>
+    <form id="loginForm">
+      <input id="accessCodeInput" type="password" placeholder="Zugangscode" autocomplete="off">
+      <button type="submit">Weiter</button>
+    </form>
+    <div id="loginError"></div>
+  </div>
+</div>
 <div id="app">
   <header>
     <div id="headerAvatar" class="avatar-badge"></div>
@@ -400,6 +467,40 @@ if (WORKER_URL.includes('PASTE_YOUR_WORKER_URL_HERE')) {
   statusEl.textContent = 'nicht eingerichtet';
   statusEl.classList.add('offline');
 }
+
+// ---- Zugangscode ----
+let accessCode = localStorage.getItem('lina_access_code') || '';
+const loginScreen = document.getElementById('loginScreen');
+const loginForm = document.getElementById('loginForm');
+const accessCodeInput = document.getElementById('accessCodeInput');
+const loginError = document.getElementById('loginError');
+
+function showLogin(errorMsg) {
+  loginScreen.classList.add('active');
+  if (errorMsg) {
+    loginError.textContent = errorMsg;
+    loginError.style.display = 'block';
+  } else {
+    loginError.style.display = 'none';
+  }
+  accessCodeInput.value = '';
+  setTimeout(() => accessCodeInput.focus(), 50);
+}
+
+function hideLogin() {
+  loginScreen.classList.remove('active');
+}
+
+if (!accessCode) showLogin();
+
+loginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const val = accessCodeInput.value.trim();
+  if (!val) return;
+  accessCode = val;
+  localStorage.setItem('lina_access_code', accessCode);
+  hideLogin();
+});
 
 function loadHistories() {
   const raw = localStorage.getItem('lina_team_history');
@@ -675,9 +776,18 @@ async function askPersona(personaKey, userContent, displayContent) {
   try {
     const res = await fetch(WORKER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Access-Code': accessCode },
       body: JSON.stringify({ messages: hist, persona: personaKey })
     });
+    if (res.status === 401) {
+      thinkingBubble.remove();
+      localStorage.removeItem('lina_access_code');
+      accessCode = '';
+      statusEl.textContent = 'nicht eingeloggt';
+      statusEl.classList.add('offline');
+      showLogin('Falscher Zugangscode. Bitte erneut eingeben.');
+      throw new Error('Unauthorized');
+    }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     thinkingBubble.remove();
@@ -696,9 +806,11 @@ async function askPersona(personaKey, userContent, displayContent) {
     return reply;
   } catch (err) {
     thinkingBubble.remove();
-    addBubble('lina', 'Hmm, ich konnte gerade nicht antworten. (' + err.message + ')', true, personaKey);
-    statusEl.textContent = 'Verbindungsfehler';
-    statusEl.classList.add('offline');
+    if (err.message !== 'Unauthorized') {
+      addBubble('lina', 'Hmm, ich konnte gerade nicht antworten. (' + err.message + ')', true, personaKey);
+      statusEl.textContent = 'Verbindungsfehler';
+      statusEl.classList.add('offline');
+    }
     throw err;
   }
 }
