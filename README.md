@@ -5,20 +5,24 @@ Zwei Teile: der **Worker** (versteckt deinen API-Key) und die **Website**
 
 ## Teil 1: Cloudflare Worker (API-Key-Proxy)
 
-Der Worker nutzt **Google Gemini** (kostenloses Kontingent, keine Kreditkarte nötig).
+Der Worker nutzt **Groq** (kostenloses Kontingent, keine Kreditkarte nötig, sehr schnell).
 
 1. Gehe auf [dash.cloudflare.com](https://dash.cloudflare.com) und erstelle ein kostenloses Konto (falls noch nicht vorhanden).
 2. Im Dashboard: **Workers & Pages** → **Create** → **Workers**-Reiter → Vorlage **"Hello World"** → Namen vergeben (z. B. `lina-proxy`) → **Deploy** (erstmal mit dem Standard-Code).
 3. Klicke danach auf **Edit code**, lösche den Beispielcode und füge den Inhalt von `worker/worker.js` (aus diesem Ordner) ein. Speichern & **Deploy**.
-4. Hol dir einen kostenlosen Gemini-API-Key: [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → mit Google-Konto einloggen → **Create API key**. Keine Kreditkarte nötig für das kostenlose Kontingent.
+4. Hol dir einen kostenlosen Groq-API-Key: [console.groq.com/keys](https://console.groq.com/keys) → Konto anlegen/einloggen → **Create API Key**. Keine Kreditkarte nötig.
 5. Gehe zu **Settings → Variables and Secrets** deines Workers, füge eine neue Variable hinzu:
-   - Name: `GEMINI_API_KEY`
-   - Wert: dein Key von aistudio.google.com
+   - Name: `GROQ_API_KEY`
+   - Wert: dein Key von console.groq.com
    - Typ: **Secret** (verschlüsselt)
-6. Speichern. Deine Worker-URL steht oben auf der Worker-Übersichtsseite, z. B.
+6. Optional, aber empfohlen — Zugangscode, damit nicht jeder mit dem Link chatten kann: noch eine Variable hinzufügen:
+   - Name: `ACCESS_CODE`
+   - Wert: ein Code deiner Wahl (den fragt die Website beim ersten Öffnen ab)
+   - Typ: **Secret**
+7. Speichern. Deine Worker-URL steht oben auf der Worker-Übersichtsseite, z. B.
    `https://lina-proxy.<dein-cloudflare-name>.workers.dev`
 
-Das kostenlose Kontingent von Gemini reicht für normale, alltägliche PA-Nutzung locker aus. Falls du später doch lieber Claude/Anthropic nutzen willst, sag einfach Bescheid — der Worker lässt sich zurückbauen.
+Das kostenlose Kontingent von Groq (14.400 Anfragen/Tag) reicht für normale, alltägliche PA-Nutzung locker aus.
 
 ## Teil 1b: Kalender-Kontext (optional, experimentell)
 
@@ -63,6 +67,7 @@ aber ab, dann antwortet Lina einfach ohne Kalenderkontext, nichts bricht dabei a
 
 ## Wichtig zu wissen
 
-- Diese Web-Version von Lina hat **keinen Zugriff** auf dein travix.ai-Projekt oder deinen Reclaim/Outlook-Kalender — das funktioniert nur in der Claude/Cowork-App, wo die entsprechenden Connectors laufen. Die Web-Lina ist eine eigenständige, einfachere Variante zum Reden/Fragen, mit echten KI-Antworten (Google Gemini) und gesprochener Stimme.
+- Diese Web-Version von Lina hat **keinen echten Zugriff** auf dein travix.ai-Projekt oder deinen Reclaim/Outlook-Kalender im Sinne von Tools/Aktionen — das funktioniert nur in der Claude/Cowork-App, wo die entsprechenden Connectors laufen. Sie bekommt lediglich optionale, unregelmäßig aktualisierte Momentaufnahmen mitgeliefert (siehe Teil 1b und status.md). Die Web-Lina ist eine eigenständige, einfachere Variante zum Reden/Fragen, mit echten KI-Antworten (Groq) und gesprochener Stimme — kein "Agent" mit Gedächtnis oder Werkzeugen.
 - Der API-Key wird ausschließlich im Cloudflare Worker gespeichert (serverseitig, verschlüsselt) — niemals im öffentlichen Website-Code.
-- Gemini hat ein kostenloses Kontingent, das für normale PA-Nutzung ausreicht. Cloudflare Worker und GitHub Pages sind in diesem Umfang ebenfalls kostenlos.
+- Groq hat ein kostenloses Kontingent, das für normale PA-Nutzung ausreicht. Cloudflare Worker und GitHub Pages sind in diesem Umfang ebenfalls kostenlos.
+- Der Zugangscode (`ACCESS_CODE`) verhindert, dass Fremde über den öffentlichen GitHub-Pages-Link mitchatten — er ist optional, aber empfohlen, da die Seite sonst für jeden mit dem Link offen ist.

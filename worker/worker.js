@@ -2,8 +2,9 @@
  * Lina Proxy Worker
  * ------------------
  * Kleiner Cloudflare-Worker, der als sicherer Vermittler zwischen der
- * Lina-Website und der Google Gemini API dient. Der API-Key bleibt hier auf
+ * Lina-Website und der Groq API dient. Der API-Key bleibt hier auf
  * dem Server (als "Secret") und wird NIE an den Browser geschickt.
+ * Groq: kostenlos, keine Kreditkarte nötig (console.groq.com).
  *
  * Optional reichert er den Kontext mit zwei Momentaufnahmen an:
  *  - Nis Kalender (Reclaim) über einen inoffiziellen, undokumentierten
@@ -66,7 +67,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, X-Access-Code',
 };
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GROQ_MODEL = 'qwen/qwen3.6-27b'; // multimodal - kann Text und Bilder
 const PROJECT_STATUS_URL = 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/status.md';
 
 function jsonResponse(payload, status = 200) {
@@ -76,26 +77,31 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
-function contentToParts(content) {
-  if (typeof content === 'string') {
-    return [{ text: content }];
-  }
+function contentToGroqContent(content) {
+  if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content.map(block => {
       if (block.type === 'image') {
-        return { inlineData: { mimeType: block.source.media_type, data: block.source.data } };
+        return {
+          type: 'image_url',
+          image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` },
+        };
       }
-      return { text: block.text || '' };
+      return { type: 'text', text: block.text || '' };
     });
   }
-  return [{ text: '' }];
+  return '';
 }
 
-function toGeminiContents(messages) {
-  return messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: contentToParts(m.content),
-  }));
+function toGroqMessages(messages, systemText) {
+  const out = [{ role: 'system', content: systemText }];
+  messages.forEach(m => {
+    out.push({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: contentToGroqContent(m.content),
+    });
+  });
+  return out;
 }
 
 function formatEventTime(value) {
@@ -174,8 +180,6 @@ export default {
       return jsonResponse({ error: 'Invalid JSON' }, 400);
     }
 
-    const contents = toGeminiContents(body.messages || []);
-
     const [calendarContext, projectContext] = await Promise.all([
       fetchCalendarContext(env),
       fetchProjectStatusContext(),
@@ -186,31 +190,29 @@ export default {
       .filter(Boolean)
       .join('\n\n');
 
+    const messages = toGroqMessages(body.messages || [], systemText);
+
     try {
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': env.GEMINI_API_KEY,
-          },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemText }] },
-            contents,
-            generationConfig: { maxOutputTokens: 1024 },
-          }),
-        }
-      );
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages,
+          max_tokens: 1024,
+        }),
+      });
 
-      const data = await geminiRes.json();
+      const data = await groqRes.json();
 
-      if (!geminiRes.ok) {
-        return jsonResponse({ error: data.error?.message || 'Gemini API error' }, geminiRes.status);
+      if (!groqRes.ok) {
+        return jsonResponse({ error: data.error?.message || 'Groq API error' }, groqRes.status);
       }
 
-      const parts = data.candidates?.[0]?.content?.parts || [];
-      const reply = parts.map(p => p.text || '').join('').trim() || '(keine Antwort)';
+      const reply = data.choices?.[0]?.message?.content?.trim() || '(keine Antwort)';
 
       return jsonResponse({ reply });
     } catch (err) {
