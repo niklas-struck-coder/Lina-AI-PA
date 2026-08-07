@@ -5,18 +5,20 @@ Zwei Teile: der **Worker** (versteckt deinen API-Key) und die **Website**
 
 ## Teil 1: Cloudflare Worker (API-Key-Proxy)
 
+Der Worker nutzt **Google Gemini** (kostenloses Kontingent, keine Kreditkarte nötig).
+
 1. Gehe auf [dash.cloudflare.com](https://dash.cloudflare.com) und erstelle ein kostenloses Konto (falls noch nicht vorhanden).
-2. Im Dashboard: **Workers & Pages** → **Create** → **Create Worker**.
-3. Gib ihm einen Namen, z. B. `lina-proxy`, und klicke **Deploy** (erstmal mit dem Standard-Code).
-4. Klicke danach auf **Edit code**, lösche den Beispielcode und füge den Inhalt von `worker/worker.js` (aus diesem Ordner) ein. Speichern & **Deploy**.
+2. Im Dashboard: **Workers & Pages** → **Create** → **Workers**-Reiter → Vorlage **"Hello World"** → Namen vergeben (z. B. `lina-proxy`) → **Deploy** (erstmal mit dem Standard-Code).
+3. Klicke danach auf **Edit code**, lösche den Beispielcode und füge den Inhalt von `worker/worker.js` (aus diesem Ordner) ein. Speichern & **Deploy**.
+4. Hol dir einen kostenlosen Gemini-API-Key: [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → mit Google-Konto einloggen → **Create API key**. Keine Kreditkarte nötig für das kostenlose Kontingent.
 5. Gehe zu **Settings → Variables and Secrets** deines Workers, füge eine neue Variable hinzu:
-   - Name: `ANTHROPIC_API_KEY`
-   - Wert: dein API-Key von [console.anthropic.com](https://console.anthropic.com/settings/keys)
+   - Name: `GEMINI_API_KEY`
+   - Wert: dein Key von aistudio.google.com
    - Typ: **Secret** (verschlüsselt)
-6. Speichern. Deine Worker-URL steht oben auf der Worker-Seite, z. B.
+6. Speichern. Deine Worker-URL steht oben auf der Worker-Übersichtsseite, z. B.
    `https://lina-proxy.<dein-cloudflare-name>.workers.dev`
 
-**Wichtig:** Setze in der Anthropic Console unter "Usage limits" ein monatliches Ausgabenlimit, damit es keine Überraschungen gibt.
+Das kostenlose Kontingent von Gemini reicht für normale, alltägliche PA-Nutzung locker aus. Falls du später doch lieber Claude/Anthropic nutzen willst, sag einfach Bescheid — der Worker lässt sich zurückbauen.
 
 ## Teil 2: Website auf GitHub Pages
 
@@ -46,6 +48,6 @@ Zwei Teile: der **Worker** (versteckt deinen API-Key) und die **Website**
 
 ## Wichtig zu wissen
 
-- Diese Web-Version von Lina hat **keinen Zugriff** auf dein travix.ai-Projekt oder deinen Reclaim/Outlook-Kalender — das funktioniert nur in der Claude/Cowork-App, wo die entsprechenden Connectors laufen. Die Web-Lina ist eine eigenständige, einfachere Variante zum Reden/Fragen, mit echten Claude-Antworten und gesprochener Stimme.
+- Diese Web-Version von Lina hat **keinen Zugriff** auf dein travix.ai-Projekt oder deinen Reclaim/Outlook-Kalender — das funktioniert nur in der Claude/Cowork-App, wo die entsprechenden Connectors laufen. Die Web-Lina ist eine eigenständige, einfachere Variante zum Reden/Fragen, mit echten KI-Antworten (Google Gemini) und gesprochener Stimme.
 - Der API-Key wird ausschließlich im Cloudflare Worker gespeichert (serverseitig, verschlüsselt) — niemals im öffentlichen Website-Code.
-- Kosten entstehen nur pro Anthropic-API-Aufruf (Nutzung), Cloudflare Worker und GitHub Pages sind in diesem Umfang kostenlos.
+- Gemini hat ein kostenloses Kontingent, das für normale PA-Nutzung ausreicht. Cloudflare Worker und GitHub Pages sind in diesem Umfang ebenfalls kostenlos.

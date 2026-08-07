@@ -2,7 +2,7 @@
  * Lina Proxy Worker
  * ------------------
  * Kleiner Cloudflare-Worker, der als sicherer Vermittler zwischen der
- * Lina-Website und der Anthropic-API dient. Der API-Key bleibt hier auf
+ * Lina-Website und der Google Gemini API dient. Der API-Key bleibt hier auf
  * dem Server (als "Secret") und wird NIE an den Browser geschickt.
  *
  * Setup: siehe README.md im Hauptordner.
@@ -26,6 +26,39 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+const GEMINI_MODEL = 'gemini-2.0-flash';
+
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+}
+
+// Wandelt ein Frontend-Content-Feld (String oder Anthropic-Style Content-Blocks
+// mit optionalem Bild) in Gemini "parts" um.
+function contentToParts(content) {
+  if (typeof content === 'string') {
+    return [{ text: content }];
+  }
+  if (Array.isArray(content)) {
+    return content.map(block => {
+      if (block.type === 'image') {
+        return { inlineData: { mimeType: block.source.media_type, data: block.source.data } };
+      }
+      return { text: block.text || '' };
+    });
+  }
+  return [{ text: '' }];
+}
+
+function toGeminiContents(messages) {
+  return messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: contentToParts(m.content),
+  }));
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -40,52 +73,40 @@ export default {
     try {
       body = await request.json();
     } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-        status: 400,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'Invalid JSON' }, 400);
     }
 
-    const messages = (body.messages || []).map(m => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-    }));
+    const contents = toGeminiContents(body.messages || []);
 
     try {
-      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001', // günstig, schnell - im Bedarfsfall änderbar
-          max_tokens: 1024,
-          system: SYSTEM_PROMPT,
-          messages,
-        }),
-      });
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': env.GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents,
+            generationConfig: { maxOutputTokens: 1024 },
+          }),
+        }
+      );
 
-      const data = await anthropicRes.json();
+      const data = await geminiRes.json();
 
-      if (!anthropicRes.ok) {
-        return new Response(JSON.stringify({ error: data.error?.message || 'Anthropic API error' }), {
-          status: anthropicRes.status,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        });
+      if (!geminiRes.ok) {
+        return jsonResponse({ error: data.error?.message || 'Gemini API error' }, geminiRes.status);
       }
 
-      const reply = data.content?.[0]?.text || '(keine Antwort)';
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const reply = parts.map(p => p.text || '').join('').trim() || '(keine Antwort)';
 
-      return new Response(JSON.stringify({ reply }), {
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ reply });
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), {
-        status: 500,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: err.message }, 500);
     }
   },
 };
