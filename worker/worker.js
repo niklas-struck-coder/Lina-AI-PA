@@ -70,11 +70,30 @@ const CORS_HEADERS = {
 const GROQ_MODEL = 'qwen/qwen3.6-27b'; // multimodal - kann Text und Bilder
 const PROJECT_STATUS_URL = 'https://raw.githubusercontent.com/niklas-struck-coder/travix.ai/main/status.md';
 
+// Feste ElevenLabs-Stimmen pro Person (Standard-Bibliothek, mehrsprachig)
+const ELEVEN_VOICE_IDS = {
+  lina: 'MF3mGyEYCl7XYWbV9V6O',      // Elli - jung, klar, ausdrucksstark
+  it: 'ErXwobaYiN019PkySvjV',        // Antoni - professionell, männlich
+  marketing: 'AZnzlk1XvdvUeBnXmlld', // Domi - selbstbewusst, energisch
+  support: 'EXAVITQu4vr4xnSDxMaL',   // Bella - weich, freundlich
+};
+const ELEVEN_MODEL = 'eleven_multilingual_v2';
+
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function contentToGroqContent(content) {
@@ -178,6 +197,34 @@ export default {
       body = await request.json();
     } catch {
       return jsonResponse({ error: 'Invalid JSON' }, 400);
+    }
+
+    // Sprachausgabe (ElevenLabs) - separater Zweig, gleicher Endpunkt.
+    if (body.action === 'speak') {
+      const voicePersona = ELEVEN_VOICE_IDS[body.persona] ? body.persona : 'lina';
+      const voiceId = ELEVEN_VOICE_IDS[voicePersona];
+      try {
+        const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': env.ELEVENLABS_API_KEY,
+            'Accept': 'audio/mpeg',
+          },
+          body: JSON.stringify({
+            text: String(body.text || '').slice(0, 2000),
+            model_id: ELEVEN_MODEL,
+          }),
+        });
+        if (!ttsRes.ok) {
+          const errText = await ttsRes.text();
+          return jsonResponse({ error: 'ElevenLabs error: ' + errText }, ttsRes.status);
+        }
+        const audioBuffer = await ttsRes.arrayBuffer();
+        return jsonResponse({ audio: arrayBufferToBase64(audioBuffer), mime: 'audio/mpeg' });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
     }
 
     const [calendarContext, projectContext] = await Promise.all([

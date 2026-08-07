@@ -841,10 +841,38 @@ function addBubble(who, content, scroll = true, personaKey = 'lina', label = nul
 }
 
 // speak(text, onEnd, force, personaKey) - force=true spricht auch wenn
-// stummgeschaltet (Anruf-Modus). Jede Persona hat eigene Stimm-Vorlieben
-// (Name + Tonhöhe/Tempo), damit sie unterscheidbar klingen.
-function speak(text, onEnd, force = false, personaKey = 'lina') {
+// stummgeschaltet (Anruf-Modus). Holt echtes, natürlich klingendes Audio
+// von ElevenLabs (über den Worker); fällt bei Fehlern/aufgebrauchtem
+// Kontingent automatisch auf die Browser-Stimme zurück.
+let currentAudio = null;
+
+async function speak(text, onEnd, force = false, personaKey = 'lina') {
   if (muted && !force) { if (onEnd) onEnd(); return; }
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Code': accessCode },
+      body: JSON.stringify({ action: 'speak', text, persona: personaKey }),
+    });
+    if (!res.ok) throw new Error('TTS HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.audio) throw new Error('Kein Audio erhalten');
+
+    const audio = new Audio(`data:${data.mime};base64,${data.audio}`);
+    currentAudio = audio;
+    audio.onended = () => { currentAudio = null; if (onEnd) onEnd(); };
+    audio.onerror = () => { currentAudio = null; speakFallback(text, onEnd, personaKey); };
+    await audio.play();
+  } catch (err) {
+    speakFallback(text, onEnd, personaKey);
+  }
+}
+
+// Browser-eigene Sprachausgabe als Rückfallebene (falls ElevenLabs mal
+// nicht erreichbar ist oder das kostenlose Kontingent aufgebraucht ist).
+function speakFallback(text, onEnd, personaKey) {
   if (!('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
