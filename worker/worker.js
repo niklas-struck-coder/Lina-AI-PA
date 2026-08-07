@@ -169,12 +169,18 @@ function formatEvents(events) {
 
 // Undokumentierter Reclaim-Endpunkt - bewusst defensiv: jeder Fehler führt
 // nur dazu, dass der Kalenderkontext fehlt, nie zu einem kompletten Ausfall.
+function toReclaimDate(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
 async function fetchCalendarContext(env) {
   if (!env.RECLAIM_API_KEY) return null;
   try {
     const now = Date.now();
-    const start = new Date(now - 6 * 3600 * 1000).toISOString();
-    const end = new Date(now + 30 * 3600 * 1000).toISOString();
+    // Reclaim akzeptiert nur ein reines Datum (YYYY-MM-DD), keine Uhrzeit.
+    const start = toReclaimDate(new Date(now - 6 * 3600 * 1000));
+    const end = toReclaimDate(new Date(now + 30 * 3600 * 1000));
     const res = await fetch(
       `https://api.app.reclaim.ai/api/events/personal?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
       { headers: { Authorization: `Bearer ${env.RECLAIM_API_KEY}` } }
