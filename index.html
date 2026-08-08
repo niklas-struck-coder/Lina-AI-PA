@@ -1273,6 +1273,27 @@ function capHistory(hist) {
   while (hist.length > MAX_STORED_MESSAGES) hist.shift();
 }
 
+// Kurzer Auszug aus den letzten privaten Gesprächen (pro Person das letzte
+// Hin und Her), damit das Team-Meeting weiß, was Ni ihnen einzeln erzählt
+// hat, ohne den kompletten Verlauf mitzuschicken (Tokenbudget).
+function buildPrivateDigest() {
+  const parts = [];
+  PERSONA_ORDER.forEach(key => {
+    if (key === 'team') return;
+    const h = histories[key];
+    if (!h || h.length === 0) return;
+    const lines = h.slice(-4).map(m => {
+      const disp = contentToDisplay(m.content);
+      const text = (typeof disp === 'string' ? disp : disp.text) || (disp.imageDataUrl ? '[Bild]' : '');
+      if (!text) return null;
+      const short = text.length > 200 ? text.slice(0, 200) + '…' : text;
+      return `${m.role === 'user' ? 'Ni' : PERSONAS[key].name}: ${short}`;
+    }).filter(Boolean);
+    if (lines.length) parts.push(`Mit ${PERSONAS[key].name}:\n${lines.join('\n')}`);
+  });
+  return parts.join('\n\n');
+}
+
 async function askPersona(personaKey, userContent, displayContent) {
   const hist = histories[personaKey];
   addBubble('user', displayContent !== undefined ? displayContent : userContent);
@@ -1284,10 +1305,15 @@ async function askPersona(personaKey, userContent, displayContent) {
   statusEl.textContent = 'tippt…';
 
   try {
+    const requestBody = { messages: trimHistoryForRequest(hist), persona: personaKey };
+    if (personaKey === 'team') {
+      const digest = buildPrivateDigest();
+      if (digest) requestBody.privateDigest = digest;
+    }
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Access-Code': accessCode },
-      body: JSON.stringify({ messages: trimHistoryForRequest(hist), persona: personaKey })
+      body: JSON.stringify(requestBody)
     });
     if (res.status === 401) {
       thinkingBubble.remove();
@@ -1312,6 +1338,17 @@ async function askPersona(personaKey, userContent, displayContent) {
     hist.push({ role: 'assistant', content: reply });
     capHistory(hist);
     saveHistories();
+
+    // Auf Wunsch ("sag das dem Team") hat die Persona etwas ins
+    // Team-Meeting gepostet - dort einsortieren, egal welcher Tab gerade
+    // offen ist (nächstes Öffnen von Team-Meeting zeigt es).
+    if (data.shareWithTeam && personaKey !== 'team') {
+      histories.team.push({ role: 'assistant', content: `${PERSONAS[personaKey].name}: ${data.shareWithTeam}` });
+      capHistory(histories.team);
+      saveHistories();
+      if (activeTab === 'team') renderActiveTab();
+    }
+
     statusEl.textContent = 'bereit';
     statusEl.classList.remove('offline');
     return reply;

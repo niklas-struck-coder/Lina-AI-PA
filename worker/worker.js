@@ -59,7 +59,31 @@ verwenden, wenn Ni danach fragt. Beides ist nur eine unregelmäßig
 aktualisierte Momentaufnahme (kein Live-Zugriff, keine Schreibrechte, keine
 Garantie auf Vollständigkeit) - wenn etwas fehlt, unklar ist, oder Ni
 Termine anlegen/ändern will, weist freundlich darauf hin, dass er dafür die
-Reclaim-App bzw. die Claude/Cowork-App nutzen soll.`;
+Reclaim-App bzw. die Claude/Cowork-App nutzen soll.
+
+Falls oben ein Abschnitt "Was zuletzt privat besprochen wurde" steht: das
+sind kurze Auszüge aus Nis Einzelgesprächen mit den anderen Personen -
+nutzt das nur als Hintergrundwissen, wenn es zur Frage passt, referenziert
+es nicht ungefragt im Detail.`;
+
+// Erlaubt Lina/IT-Chef/Marketing-Chef/Support-Chef, auf ausdrücklichen
+// Wunsch von Ni eine kurze Nachricht ins gemeinsame Team-Meeting zu posten
+// (z.B. "sag das auch dem Team" / "schreib das ins Team-Meeting"). Nicht für
+// 'team' selbst - da kann eh direkt jeder antworten.
+const SHARE_WITH_TEAM_TOOL = {
+  type: 'function',
+  function: {
+    name: 'share_with_team',
+    description: 'Postet eine kurze Nachricht im gemeinsamen Team-Meeting-Chat, sichtbar für Lina, IT-Chef, Marketing-Chef und Support-Chef. NUR aufrufen, wenn Ni ausdrücklich darum bittet (z.B. "sag das dem Team", "schreib das ins Team-Meeting", "teile das mit allen").',
+    parameters: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Die Nachricht für den Team-Chat, klar und kurz formuliert.' },
+      },
+      required: ['message'],
+    },
+  },
+};
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -308,13 +332,20 @@ export default {
 
     const persona = SYSTEM_PROMPTS[body.persona] ? body.persona : 'lina';
 
+    // Kurze Auszüge aus Nis privaten Einzelgesprächen - nur wenn das Team
+    // gefragt wird, vom Frontend mitgeschickt (privateDigest), auf eine
+    // sinnvolle Länge gedeckelt.
+    const privateDigest = persona === 'team' && typeof body.privateDigest === 'string' && body.privateDigest.trim()
+      ? `Was zuletzt privat besprochen wurde:\n${body.privateDigest.trim().slice(0, 2000)}`
+      : null;
+
     const [calendarContext, projectContext, departmentReport] = await Promise.all([
       fetchCalendarContext(env),
       fetchProjectStatusContext(),
       fetchDepartmentReport(persona),
     ]);
 
-    const systemText = [SYSTEM_PROMPTS[persona], CONTEXT_NOTE, calendarContext, projectContext, departmentReport]
+    const systemText = [SYSTEM_PROMPTS[persona], CONTEXT_NOTE, calendarContext, projectContext, departmentReport, privateDigest]
       .filter(Boolean)
       .join('\n\n');
 
@@ -332,6 +363,7 @@ export default {
           messages,
           max_tokens: 2048, // qwen3.6 verbraucht Tokens fürs "Denken" vor der eigentlichen Antwort
           reasoning_format: 'hidden', // Denkteil serverseitig unterdrücken statt nachträglich rausfiltern
+          ...(persona !== 'team' ? { tools: [SHARE_WITH_TEAM_TOOL], tool_choice: 'auto' } : {}),
         }),
       });
 
@@ -341,16 +373,29 @@ export default {
         return jsonResponse({ error: data.error?.message || 'Groq API error' }, groqRes.status);
       }
 
-      let reply = data.choices?.[0]?.message?.content || '';
+      const message = data.choices?.[0]?.message;
+
+      let shareWithTeam = null;
+      const toolCall = message?.tool_calls?.find(c => c.function?.name === 'share_with_team');
+      if (toolCall) {
+        try {
+          const args = JSON.parse(toolCall.function.arguments || '{}');
+          if (args.message) shareWithTeam = String(args.message).trim().slice(0, 1000);
+        } catch {}
+      }
+
+      let reply = message?.content || '';
       // Sicherheitsnetz: falls reasoning_format ignoriert wird oder der
       // Denkteil vor dem schließenden Tag abgeschnitten wird (Modell rennt
       // ins Token-Limit), nie rohen Gedankengang an den Nutzer weitergeben.
       reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-      if (!reply || reply.includes('<think>')) {
+      if (!reply && shareWithTeam) {
+        reply = 'Alles klar, hab ich ins Team-Meeting geschrieben.';
+      } else if (!reply || reply.includes('<think>')) {
         reply = 'Sorry, meine Antwort ist mir zu lang/komplex geraten und wurde abgeschnitten. Magst du die Frage nochmal kürzer stellen?';
       }
 
-      return jsonResponse({ reply });
+      return jsonResponse({ reply, shareWithTeam });
     } catch (err) {
       return jsonResponse({ error: err.message }, 500);
     }
