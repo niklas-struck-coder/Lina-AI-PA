@@ -1374,44 +1374,16 @@ const hangupBtn = document.getElementById('hangup');
 const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let callActive = false;
-let bargeInRecognition = null;
-
-// Läuft parallel, während die KI spricht, und hört NUR mit, um zu merken,
-// ob Ni reinredet ("Barge-in"). Sobald etwas Verständliches ankommt, wird
-// die KI-Stimme sofort gestoppt und auf normales Zuhören umgeschaltet.
-function stopBargeInListener() {
-  if (bargeInRecognition) {
-    const r = bargeInRecognition;
-    bargeInRecognition = null;
-    r.onresult = null;
-    r.onend = null;
-    r.onerror = null;
-    try { r.stop(); } catch (e) {}
-  }
-}
-
-function startBargeInListener() {
-  if (!SpeechRecognitionCtor || !callActive) return;
-  stopBargeInListener();
-  const r = new SpeechRecognitionCtor();
-  bargeInRecognition = r;
-  r.lang = 'de-DE';
-  r.interimResults = true;
-  r.continuous = true;
-  r.onresult = (event) => {
-    const last = event.results[event.results.length - 1];
-    const transcript = last && last[0] ? last[0].transcript.trim() : '';
-    if (transcript.length > 1) {
-      r.onresult = null;
-      r.onend = () => { if (bargeInRecognition === r) bargeInRecognition = null; stopSpeaking(); if (callActive) listenOnce(); };
-      bargeInRecognition = null;
-      try { r.stop(); } catch (e) { stopSpeaking(); if (callActive) listenOnce(); }
-    }
-  };
-  r.onerror = () => {};
-  r.onend = () => { if (bargeInRecognition === r) bargeInRecognition = null; };
-  try { r.start(); } catch (e) { bargeInRecognition = null; }
-}
+// Hinweis: Es gab hier mal ein "Barge-in" (Mikrofon hört mit, während die KI
+// spricht, um Reinreden zu erkennen). Root Cause eines Bugs, bei dem im
+// Anruf keine Stimme mehr zu hören war (Text kam, Ton nicht): das Mikrofon
+// hat vermutlich die eigene KI-Stimme aus dem Lautsprecher aufgeschnappt
+// und sich dadurch selbst sofort wieder stummgeschaltet, bzw. zwei parallel
+// laufende Spracherkennungs-Sessions haben die Audiowiedergabe gestört.
+// Deshalb bewusst entfernt - Anruf ist jetzt wieder strikt abwechselnd
+// (erst sie fertig sprechen lassen, dann reden), aber die Stimme ist
+// verlässlich zu hören, was wichtiger ist.
+function stopBargeInListener() {}
 
 function setCallState(state) {
   callOverlay.classList.remove('listening', 'speaking', 'idle');
@@ -1525,10 +1497,9 @@ async function handleCallUtterance(text) {
     if (!callActive) return;
     if (!reply) { if (callActive) listenOnce(); return; }
     if (activeTab === 'team') {
-      startBargeInListener();
       speakSegmentsQueue(
         parseTeamReply(reply), 0,
-        () => { stopBargeInListener(); if (callActive) listenOnce(); },
+        () => { if (callActive) listenOnce(); },
         (seg, key) => {
           callCaptionEl.textContent = (seg.name ? getPersona(key).name + ': ' : '') + seg.text;
           setCallState('speaking');
@@ -1538,8 +1509,7 @@ async function handleCallUtterance(text) {
     } else {
       callCaptionEl.textContent = reply;
       setCallState('speaking');
-      startBargeInListener();
-      speak(reply, () => { stopBargeInListener(); if (callActive) listenOnce(); }, true, activeTab);
+      speak(reply, () => { if (callActive) listenOnce(); }, true, activeTab);
     }
   } catch (err) {
     if (!callActive) return;
